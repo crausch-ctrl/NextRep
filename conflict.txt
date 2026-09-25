@@ -1,1 +1,4 @@
-NextRep database is still being decided
+
+=======
+NextRep will use SQLite
+>>>>>>> conflict-practice
