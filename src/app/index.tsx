@@ -35,24 +35,36 @@ export default function HomeScreen() {
         <ThemedView style={styles.heroSection}>
           <AnimatedIcon />
           <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
+            Welcome NextRep
           </ThemedText>
         </ThemedView>
 
         <ThemedText type="code" style={styles.code}>
-          get started
+          PLAYER DASHBOARD
         </ThemedText>
 
         <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
+         <ThemedText type="subtitle">Your Performance</ThemedText>
+
+        <ThemedView style={styles.statCard}>
+           <ThemedText>Bench Press</ThemedText>
+           <ThemedText type="subtitle">225 lbs</ThemedText>
+        </ThemedView>
+
+        <ThemedView style={styles.statCard}>
+          <ThemedText>Squat</ThemedText>
+          <ThemedText type="subtitle">315 lbs</ThemedText>
+        </ThemedView>
+
+        <ThemedView style={styles.statCard}>
+          <ThemedText>40-Yard Dash</ThemedText>
+          <ThemedText type="subtitle">4.72 sec</ThemedText>
+        </ThemedView>
+
+        <ThemedView style={styles.statCard}>
+          <ThemedText>Vertical Jump</ThemedText>
+          <ThemedText type="subtitle">31 in</ThemedText>
+        </ThemedView>
         </ThemedView>
 
         {Platform.OS === 'web' && <WebBadge />}
@@ -95,4 +107,10 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.four,
     borderRadius: Spacing.four,
   },
+  statCard: {
+   padding: Spacing.three,
+   borderRadius: Spacing.three,
+   borderWidth: 1,
+   gap: Spacing.one,
+},
 });
