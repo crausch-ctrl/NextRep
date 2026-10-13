@@ -1,7 +1,11 @@
 const sqlite3 = require("sqlite3").verbose();
+const path = require("path");
+
+// Path to the SQLite database in the database tier
+const dbPath = path.join(__dirname, "../database/nextrep.db");
 
 // Connect to the NextRep database
-const db = new sqlite3.Database("./nextrep.db", (err) => {
+const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error("Database connection error:", err.message);
   } else {
