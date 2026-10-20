@@ -1,7 +1,7 @@
 /* 
  this file contains the SQL schema for the database, */
 
-/* this is the table that holds the user infromation*/*
+/* this is the table that holds the user infromation*/
 CREATE TABLE IF NOT EXISTS users(
     id INTEGER PRIMARY KEY AUTOINCREMENT, 
     first_name TEXT NOT NULL, 
@@ -31,8 +31,13 @@ CREATE TABLE IF NOT EXISTS teams(
     sport TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE TABLE IF NOT EXISTS teams_Memberships(
-
-
+/* this is the table that connects a user to a team.*/
+CREATE TABLE IF NOT EXISTS team_memberships(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    team_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (team_id) REFERENCES teams(id),
+    UNIQUE(user_id, team_id)
 );
