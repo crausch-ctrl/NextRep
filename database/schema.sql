@@ -71,3 +71,14 @@ CREATE TABLE IF NOT EXISTS goals(
     FOREIGN KEY (player_id) REFERENCES users(id),
     FOREIGN KEY (metric_id) REFERENCES metrics(id)
 );
+CREATE TABLE IF NOT EXISTS invitations(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    team_id INTEGER NOT NULL, 
+    email TEXT NOT NULL,
+    invited_by INTEGER NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'declined', 'expired')),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL, 
+    FOREIGN KEY (team_id) REFERENCES teams(id),
+    FOREIGN KEY (invited_by) REFERENCES users(id)
+);
