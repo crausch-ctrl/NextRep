@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const authController = require("./controllers/authController");
-const { requireAuth } = require("./middleware/auth");
+const { requireAuth, requireRole } = require("./middleware/auth");
 
 const app = express();
 const PORT = 3000;
@@ -20,6 +20,11 @@ app.post("/login", authController.login);
 // Protected route: only works with a valid token
 app.get("/me", requireAuth, (req, res) => {
   res.json({ user: req.user });
+});
+
+// Coach-only route: valid token AND role must be coach
+app.get("/coach-only", requireAuth, requireRole("coach"), (req, res) => {
+  res.json({ message: "Welcome, coach!" });
 });
 
 app.listen(PORT, () => {
