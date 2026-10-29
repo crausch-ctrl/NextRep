@@ -1,116 +1,67 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
+type Role = 'Player' | 'Coach';
+type Metric = 'Squat' | 'Bench' | 'Vertical' | '40 Yard Dash';
+type Result = { metric: Metric; value: number; date: string };
+const MAROON = '#961b3b';
+const metrics: Metric[] = ['Squat','Bench','Vertical','40 Yard Dash'];
+const units: Record<Metric,string> = {Squat:'lbs',Bench:'lbs',Vertical:'in', '40 Yard Dash':'sec'};
+const initial: Result[] = [
+ {metric:'Squat',value:350,date:'2026-01-15'}, {metric:'Squat',value:375,date:'2026-03-15'}, {metric:'Squat',value:405,date:'2026-05-15'}, {metric:'Squat',value:425,date:'2026-09-15'},
+ {metric:'Bench',value:245,date:'2026-01-15'}, {metric:'Bench',value:265,date:'2026-04-15'}, {metric:'Bench',value:295,date:'2026-09-15'},
+ {metric:'Vertical',value:30,date:'2026-01-15'}, {metric:'Vertical',value:34,date:'2026-09-15'},
+ {metric:'40 Yard Dash',value:4.84,date:'2026-01-15'}, {metric:'40 Yard Dash',value:4.68,date:'2026-09-15'},
+];
+const rosterSeed = [
+ {name:'Thomas Cerruti',pos:'LB',grade:'Sr',squat:425,bench:295,vert:34,dash:4.68},
+ {name:'CJ Newman',pos:'LB',grade:'Sr',squat:405,bench:315,vert:32,dash:4.72},
+ {name:'Leo Dauberman',pos:'DB',grade:'Jr',squat:365,bench:275,vert:33,dash:4.59},
+ {name:'Christopher Short',pos:'WR',grade:'Jr',squat:355,bench:245,vert:38,dash:4.51},
+ {name:'Triquil Monroe',pos:'OL',grade:'Sr',squat:495,bench:335,vert:28,dash:5.12},
+];
+const navPlayer=['Home','Log Numbers','Progress','Goals','Photos','Profile'];
+const navCoach=['Dashboard','Roster','Testing','Approvals','Team Analytics','Reports','Announcements','Settings'];
+function Btn({title,onPress,outline=false}: {title:string;onPress:()=>void;outline?:boolean}) {return <TouchableOpacity onPress={onPress} style={[s.button,outline&&s.outline]}><Text style={[s.buttonText,outline&&{color:MAROON}]}>{title}</Text></TouchableOpacity>}
+function Card({title,children,style}: {title?:string;children:React.ReactNode;style?:any}) {return <View style={[s.card,style]}>{title?<Text style={s.cardTitle}>{title}</Text>:null}{children}</View>}
+function Field({label,value,onChange,secure=false,keyboardType}: {label:string;value:string;onChange:(v:string)=>void;secure?:boolean;keyboardType?:'numeric'|'email-address'}) {return <View style={{marginBottom:13}}><Text style={s.fieldLabel}>{label}</Text><TextInput placeholder={label} placeholderTextColor="#9298a2" value={value} onChangeText={onChange} secureTextEntry={secure} keyboardType={keyboardType} autoCapitalize="none" style={s.input}/></View>}
+export default function NextRep() {
+ const {width}=useWindowDimensions(); const wide=width>=850;
+ const [role,setRole]=useState<Role>('Player');const [logged,setLogged]=useState(false);const [email,setEmail]=useState('');const [password,setPassword]=useState('');
+ const [page,setPage]=useState('Home');const [results,setResults]=useState<Result[]>(initial);const [metric,setMetric]=useState<Metric>('Squat');const [value,setValue]=useState('');
+ const [goalMetric,setGoalMetric]=useState<Metric>('Squat');const [goalValue,setGoalValue]=useState('');const [goals,setGoals]=useState<Record<Metric,number>>({Squat:450,Bench:315,Vertical:36,'40 Yard Dash':4.6});
+ const [search,setSearch]=useState('');const [announcements,setAnnouncements]=useState<string[]>(['Welcome to NextRep! Testing day is coming up.']);const [announcement,setAnnouncement]=useState('');
+ const [pending,setPending]=useState(7);const [selectedPlayer,setSelectedPlayer]=useState('Thomas Cerruti');
+ const latest=useMemo(()=>Object.fromEntries(metrics.map(m=>[m,results.filter(r=>r.metric===m).slice(-1)[0]?.value??0])) as Record<Metric,number>,[results]);
+ const history=results.filter(r=>r.metric===metric); const min=Math.min(...history.map(r=>r.value)),max=Math.max(...history.map(r=>r.value));
+ function saveResult(){const n=Number(value);if(!value.trim()||!Number.isFinite(n)||n<=0){Alert.alert('Invalid result','Enter a positive number.');return}setResults(v=>[...v,{metric,value:n,date:new Date().toISOString().slice(0,10)}]);setValue('');setPage(role==='Player'?'Home':'Testing');Alert.alert('Saved','Result added to this demo session.');}
+ function saveGoal(){const n=Number(goalValue);if(!goalValue.trim()||!Number.isFinite(n)||n<=0){Alert.alert('Invalid goal','Enter a positive number.');return}setGoals(v=>({...v,[goalMetric]:n}));setGoalValue('');}
+ const nav=role==='Player'?navPlayer:navCoach;
+ const statCards=<View style={s.statGrid}>{metrics.map(m=><View key={m} style={s.stat}><Text style={s.muted}>{m}</Text><Text style={s.statNumber}>{latest[m]} <Text style={s.statUnit}>{units[m]}</Text></Text><Text style={s.positive}>● Latest result</Text></View>)}</View>;
+ const progress=<Card title="Progress Over Time"><View style={s.pills}>{metrics.map(m=><TouchableOpacity key={m} style={[s.pill,metric===m&&s.pillActive]} onPress={()=>setMetric(m)}><Text style={[s.pillText,metric===m&&{color:'white'}]}>{m}</Text></TouchableOpacity>)}</View><View style={s.graph}>{history.map((r,i)=><View key={i} style={s.graphCol}><View style={[s.graphBar,{height:Math.max(8,24+((r.value-min)/(max-min||1))*120)}]}/><Text style={s.graphLabel}>{r.value}</Text></View>)}</View><Text style={s.muted}>{metric} history • {units[metric]} • Demo values</Text></Card>;
+ const goalCards=<Card title="Current Goals">{metrics.map(m=>{const ratio=m==='40 Yard Dash'?Math.min(1,goals[m]/latest[m]):Math.min(1,latest[m]/goals[m]);return <View key={m} style={s.goalRow}><View style={s.space}><Text style={s.bodyBold}>{m}</Text><Text style={s.muted}>{latest[m]} / {goals[m]} {units[m]}</Text></View><View style={s.track}><View style={[s.fill,{width:`${Math.max(0,Math.min(100,ratio*100))}%`}]}/></View></View>})}<Btn title="Edit Goals" outline onPress={()=>setPage('Goals')}/></Card>;
+ const activity=<Card title="Recent Activity">{results.slice(-5).reverse().map((r,i)=><View key={i} style={s.activity}><Text style={s.accent}>↑</Text><View><Text style={s.bodyBold}>{r.metric}: {r.value} {units[r.metric]}</Text><Text style={s.muted}>{r.date}</Text></View></View>)}</Card>;
+ const logForm=<Card title="Log New Result"><Text style={s.muted}>Select a test</Text><View style={s.pills}>{metrics.map(m=><TouchableOpacity key={m} style={[s.pill,metric===m&&s.pillActive]} onPress={()=>setMetric(m)}><Text style={[s.pillText,metric===m&&{color:'white'}]}>{m}</Text></TouchableOpacity>)}</View><Field label={`Result (${units[metric]})`} value={value} onChange={setValue} keyboardType="numeric"/><Btn title="Save Result" onPress={saveResult}/><Text style={s.footnote}>Demo only: results reset when the app reloads.</Text></Card>;
+ const roster=<Card title="Team Roster"><Field label="Search players" value={search} onChange={setSearch}/><ScrollView horizontal><View style={{minWidth:600}}><View style={[s.tableRow,s.tableHeader]}>{['Name','Pos','Grade','Squat','Bench','Vert','40'].map(h=><Text key={h} style={[s.tableCell,s.bodyBold]}>{h}</Text>)}</View>{rosterSeed.filter(p=>p.name.toLowerCase().includes(search.toLowerCase())).map(p=><TouchableOpacity key={p.name} onPress={()=>{setSelectedPlayer(p.name);setPage('Player Details')}} style={s.tableRow}>{[p.name,p.pos,p.grade,p.squat,p.bench,p.vert,p.dash].map((v,i)=><Text key={i} style={s.tableCell}>{v}</Text>)}</TouchableOpacity>)}</View></ScrollView></Card>;
+ if(!logged)return <SafeAreaView style={s.loginRoot}><ScrollView contentContainerStyle={[s.loginWrap,{flexDirection:wide?'row':'column'}]}><View style={[s.loginBrand,{width:wide?'48%':'100%'}]}><Text style={s.logoBig}>Next<Text style={{color:'#e24d70'}}>Rep</Text></Text><Text style={s.tagline}>TRACK   |   IMPROVE   |   COMPETE</Text><Text style={s.motto}>A STRONGER TOMORROW STARTS TODAY.</Text><Text style={s.brandFoot}>MUHLENBERG FOOTBALL</Text></View><View style={[s.loginPanel,{width:wide?'52%':'100%'}]}><Text style={s.loginTitle}>Welcome to NextRep</Text><Text style={[s.muted,{fontSize:17,marginBottom:28}]}>Log in to track your progress and build your next rep.</Text><View style={s.roleRow}>{(['Player','Coach'] as Role[]).map(r=><TouchableOpacity key={r} onPress={()=>setRole(r)} style={[s.roleButton,role===r&&s.roleSelected]}><Text style={[s.bodyBold,role===r&&{color:'white'}]}>{r}</Text></TouchableOpacity>)}</View><Field label="Email Address" value={email} onChange={setEmail} keyboardType="email-address"/><Field label="Password" value={password} onChange={setPassword} secure/><Btn title={`Enter ${role} Demo`} onPress={()=>{setLogged(true);setPage(role==='Player'?'Home':'Dashboard')}}/><Text style={s.footnote}>Demo access: enter any email and password or leave blank. No real authentication is connected.</Text></View></ScrollView></SafeAreaView>;
+ return <SafeAreaView style={s.app}><View style={[s.shell,{flexDirection:wide?'row':'column'}]}><View style={[s.sidebar,{width:wide?210:'100%'}]}><Text style={s.logo}>Next<Text style={{color:'#e24d70'}}>Rep</Text></Text><ScrollView horizontal={!wide} contentContainerStyle={wide?{gap:5}:{gap:5}}>{nav.map(n=><TouchableOpacity key={n} onPress={()=>setPage(n)} style={[s.navItem,page===n&&s.navActive]}><Text style={[s.navText,page===n&&{color:'white'}]}>{n}</Text></TouchableOpacity>)}</ScrollView><TouchableOpacity onPress={()=>{setLogged(false);setPassword('')}} style={s.logout}><Text style={s.navText}>Log Out</Text></TouchableOpacity></View><ScrollView style={s.content} contentContainerStyle={s.contentInner}><View style={s.topbar}><View><Text style={s.heading}>{role==='Player'?'Player Dashboard':'Team Dashboard'}</Text><Text style={s.muted}>{role==='Player'?'Individual progress and performance':'Muhlenberg Football • Team overview'}</Text></View><Text style={s.avatar}>{role==='Player'?'TC':'M'}</Text></View>
+ {role==='Player'?<>
+ {page==='Home'&&<><Card><Text style={s.hello}>Welcome back, Thomas!</Text><Text style={s.playerName}>Thomas Cerruti</Text><Text style={s.muted}>#40  |  Linebacker  |  Senior</Text><Text style={s.muted}>Height: 6'0"   Weight: 220 lbs</Text><Text style={[s.positive,{marginTop:12}]}>● Full Participation</Text></Card>{statCards}<View style={[s.columns,{flexDirection:wide?'row':'column'}]}><View style={{flex:1}}>{progress}</View><View style={{flex:1}}>{goalCards}</View></View>{activity}<Btn title="＋ Log New Result" onPress={()=>setPage('Log Numbers')}/></>}
+ {page==='Log Numbers'&&logForm}{page==='Progress'&&<>{statCards}{progress}{activity}</>}{page==='Goals'&&<>{goalCards}<Card title="Set a Goal"><View style={s.pills}>{metrics.map(m=><TouchableOpacity key={m} style={[s.pill,goalMetric===m&&s.pillActive]} onPress={()=>setGoalMetric(m)}><Text style={[s.pillText,goalMetric===m&&{color:'white'}]}>{m}</Text></TouchableOpacity>)}</View><Field label={`New goal (${units[goalMetric]})`} value={goalValue} onChange={setGoalValue} keyboardType="numeric"/><Btn title="Save Goal" onPress={saveGoal}/></Card></>}
+ {page==='Photos'&&<Card title="Progress Photos"><Text style={s.muted}>Photo upload and storage will be available after backend integration.</Text></Card>}{page==='Profile'&&<Card title="Player Profile"><Text style={s.playerName}>Thomas Cerruti</Text><Text style={s.muted}>#40 • Linebacker • Senior</Text><Text style={s.footnote}>Sample profile. Connect your database to display the signed-in athlete.</Text></Card>}
+ </>:<>
+ {page==='Dashboard'&&<><View style={s.coachStats}>{[['92','Total Players'],[String(pending),'Pending Approvals'],['5','Missing Data'],['Mar 15','Next Testing Day']].map(([n,l])=><View key={l} style={s.coachStat}><Text style={s.statNumber}>{n}</Text><Text style={s.muted}>{l}</Text></View>)}</View><View style={[s.columns,{flexDirection:wide?'row':'column'}]}><View style={{flex:1}}><Card title="Team Averages">{[['Squat','405 lbs'],['Bench','285 lbs'],['Vertical','31.4 in'],['40 Yard Dash','4.79 sec']].map(([k,v])=><View key={k} style={s.activity}><Text style={s.bodyBold}>{k}</Text><Text>{v}</Text></View>)}</Card></View><View style={{flex:1}}><Card title="Recent PRs">{rosterSeed.slice(0,4).map(p=><View key={p.name} style={s.activity}><Text style={s.accent}>↑</Text><View><Text style={s.bodyBold}>{p.name}</Text><Text style={s.muted}>Squat {p.squat} lbs</Text></View></View>)}</Card></View></View>{roster}<Btn title="Enter Testing Results" onPress={()=>setPage('Testing')}/></>}
+ {page==='Roster'&&roster}{page==='Player Details'&&<Card title="Player Details"><Text style={s.playerName}>{selectedPlayer}</Text><Text style={s.muted}>Selected from demo roster.</Text><Btn title="Back to Roster" outline onPress={()=>setPage('Roster')}/></Card>}
+ {page==='Testing'&&<><Text style={s.muted}>Testing Day Mode • Enter a demo result</Text>{logForm}</>}
+ {page==='Approvals'&&<Card title="Pending Approvals"><Text style={s.statNumber}>{pending}</Text><Text style={s.muted}>Sample pending results</Text><Btn title="Approve One Demo Result" onPress={()=>setPending(p=>Math.max(0,p-1))}/></Card>}
+ {page==='Team Analytics'&&<><Card title="Position Group Averages"><Text style={s.muted}>Demo roster comparison</Text>{['LB','DB','WR','OL'].map(pos=>{const arr=rosterSeed.filter(p=>p.pos===pos);return <View key={pos} style={s.activity}><Text style={s.bodyBold}>{pos}</Text><Text>Avg Squat: {Math.round(arr.reduce((a,p)=>a+p.squat,0)/arr.length)} lbs</Text></View>})}</Card>{progress}</>}
+ {page==='Reports'&&<Card title="Reports"><Text style={s.muted}>Report export requires backend integration. Current demo data is shown on the Dashboard and Roster.</Text></Card>}
+ {page==='Announcements'&&<Card title="Team Announcements">{announcements.map((a,i)=><Text key={i} style={s.activity}>{a}</Text>)}<Field label="Write an announcement" value={announcement} onChange={setAnnouncement}/><Btn title="Post Demo Announcement" onPress={()=>{if(announcement.trim()){setAnnouncements(a=>[announcement.trim(),...a]);setAnnouncement('')}}}/></Card>}
+ {page==='Settings'&&<Card title="Settings"><Text style={s.muted}>Demo settings. Account management will require a connected backend.</Text></Card>}
+ </>}
+ <Text style={s.footer}>NextRep • Frontend prototype • Sample data, not connected to a live server</Text></ScrollView></View></SafeAreaView>;
 }
-
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome NextRep
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          PLAYER DASHBOARD
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-         <ThemedText type="subtitle">Your Performance</ThemedText>
-
-        <ThemedView style={styles.statCard}>
-           <ThemedText>Bench Press</ThemedText>
-           <ThemedText type="subtitle">225 lbs</ThemedText>
-        </ThemedView>
-
-        <ThemedView style={styles.statCard}>
-          <ThemedText>Squat</ThemedText>
-          <ThemedText type="subtitle">315 lbs</ThemedText>
-        </ThemedView>
-
-        <ThemedView style={styles.statCard}>
-          <ThemedText>40-Yard Dash</ThemedText>
-          <ThemedText type="subtitle">4.72 sec</ThemedText>
-        </ThemedView>
-
-        <ThemedView style={styles.statCard}>
-          <ThemedText>Vertical Jump</ThemedText>
-          <ThemedText type="subtitle">31 in</ThemedText>
-        </ThemedView>
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
-  statCard: {
-   padding: Spacing.three,
-   borderRadius: Spacing.three,
-   borderWidth: 1,
-   gap: Spacing.one,
-},
+const s=StyleSheet.create({
+ app:{flex:1,backgroundColor:'#f4f5f7'},shell:{flex:1},sidebar:{backgroundColor:'#22262b',padding:13,gap:12},logo:{color:'white',fontWeight:'900',fontSize:26,marginVertical:15},navItem:{paddingVertical:13,paddingHorizontal:14,borderRadius:8},navActive:{backgroundColor:'#813044'},navText:{color:'#e3e4e8',fontWeight:'600',fontSize:13},logout:{padding:12},content:{flex:1},contentInner:{padding:20,gap:16,maxWidth:1400,width:'100%',alignSelf:'center'},topbar:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:4},heading:{fontSize:27,fontWeight:'800',color:'#1e232a'},avatar:{backgroundColor:'#823344',color:'white',borderRadius:50,overflow:'hidden',padding:12,fontWeight:'800'},muted:{color:'#6b7280',fontSize:13,marginTop:3},card:{backgroundColor:'white',borderRadius:12,padding:20,borderWidth:1,borderColor:'#e6e8ed',gap:10},cardTitle:{fontSize:18,fontWeight:'800',color:'#20242b',marginBottom:6},hello:{fontSize:15,color:'#323740'},playerName:{fontSize:23,fontWeight:'800',color:'#20242b'},positive:{color:'#2b9d4b',fontSize:12,fontWeight:'700'},statGrid:{flexDirection:'row',flexWrap:'wrap',gap:10},stat:{flexGrow:1,flexBasis:145,backgroundColor:'white',borderRadius:11,padding:17,borderColor:'#e6e8ed',borderWidth:1,gap:8},statNumber:{fontSize:25,fontWeight:'900',color:'#171b21'},statUnit:{fontSize:15,fontWeight:'700'},columns:{gap:12},pills:{flexDirection:'row',flexWrap:'wrap',gap:6,marginVertical:8},pill:{paddingHorizontal:12,paddingVertical:9,borderRadius:7,backgroundColor:'#f0f1f4'},pillActive:{backgroundColor:MAROON},pillText:{fontSize:12,color:'#363a42',fontWeight:'600'},graph:{height:190,flexDirection:'row',alignItems:'flex-end',justifyContent:'space-around',paddingTop:20,paddingBottom:10,borderBottomWidth:1,borderColor:'#d9dce2'},graphCol:{alignItems:'center',justifyContent:'flex-end',gap:5},graphBar:{width:25,backgroundColor:MAROON,borderTopLeftRadius:5,borderTopRightRadius:5},graphLabel:{fontSize:11,color:'#646b75'},goalRow:{marginBottom:13,gap:6},space:{flexDirection:'row',justifyContent:'space-between'},bodyBold:{fontWeight:'700',color:'#252a31',fontSize:13},track:{height:11,backgroundColor:'#edf0f3',borderRadius:9,overflow:'hidden'},fill:{height:'100%',backgroundColor:MAROON,borderRadius:9},activity:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderBottomWidth:1,borderBottomColor:'#edf0f3',paddingVertical:11,gap:10},accent:{color:MAROON,fontSize:22,fontWeight:'900'},button:{backgroundColor:MAROON,borderRadius:9,padding:14,alignItems:'center',marginTop:7},buttonText:{color:'white',fontSize:15,fontWeight:'800'},outline:{backgroundColor:'white',borderColor:MAROON,borderWidth:1},fieldLabel:{fontSize:13,color:'#4c525c',marginBottom:5,fontWeight:'600'},input:{borderWidth:1,borderColor:'#d5d9e1',backgroundColor:'white',borderRadius:9,padding:13,fontSize:15,color:'#1c2027'},footnote:{fontSize:12,color:'#818895',marginTop:10},footer:{textAlign:'center',color:'#8c929c',fontSize:12,marginTop:15},coachStats:{flexDirection:'row',flexWrap:'wrap',gap:10},coachStat:{flexGrow:1,flexBasis:145,backgroundColor:'white',padding:20,borderWidth:1,borderColor:'#e7e9ee',borderRadius:10,alignItems:'center',gap:8},tableRow:{flexDirection:'row',borderBottomWidth:1,borderColor:'#eceef2',paddingVertical:12},tableHeader:{backgroundColor:'#f5f6f8'},tableCell:{width:85,fontSize:12,color:'#252a31'},loginRoot:{flex:1,backgroundColor:'#f6f7f9'},loginWrap:{flexGrow:1},loginBrand:{backgroundColor:'#202126',padding:35,justifyContent:'center',minHeight:350},logoBig:{color:'white',fontSize:57,fontWeight:'900',fontStyle:'italic'},tagline:{color:'#d3d5d9',letterSpacing:3,fontWeight:'700',marginTop:14},motto:{color:'white',fontSize:29,fontWeight:'900',fontStyle:'italic',marginTop:80,maxWidth:340},brandFoot:{color:'#d5d5d7',letterSpacing:3,marginTop:65},loginPanel:{padding:35,justifyContent:'center',maxWidth:650,alignSelf:'center'},loginTitle:{fontSize:33,fontWeight:'900',color:'#15171c',marginBottom:10},roleRow:{flexDirection:'row',borderWidth:1,borderColor:'#e2e4e9',borderRadius:12,overflow:'hidden',marginBottom:25},roleButton:{flex:1,alignItems:'center',padding:15},roleSelected:{backgroundColor:MAROON}
 });
