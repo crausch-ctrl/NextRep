@@ -28,4 +28,25 @@ db.run(`
   }
 });
 
+// Create the player_profiles table (same columns as Thomas's schema)
+db.run(`
+  CREATE TABLE IF NOT EXISTS player_profiles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER UNIQUE NOT NULL,
+    jersey_number INTEGER,
+    position TEXT,
+    weight NUMERIC,
+    height NUMERIC,
+    class_year TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  )
+`, (err) => {
+  if (err) {
+    console.error("Error creating player_profiles table:", err.message);
+  } else {
+    console.log("Player profiles table is ready.");
+  }
+});
+
 module.exports = db;

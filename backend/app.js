@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const authController = require("./controllers/authController");
+const profileController = require("./controllers/profileController");
 const { requireAuth, requireRole } = require("./middleware/auth");
 
 const app = express();
@@ -26,6 +27,10 @@ app.get("/me", requireAuth, (req, res) => {
 app.get("/coach-only", requireAuth, requireRole("coach"), (req, res) => {
   res.json({ message: "Welcome, coach!" });
 });
+
+// Player profile routes: valid token AND role must be player
+app.get("/profile", requireAuth, requireRole("player"), profileController.getProfile);
+app.put("/profile", requireAuth, requireRole("player"), profileController.saveProfile);
 
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
