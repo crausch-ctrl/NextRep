@@ -1,7 +1,14 @@
 const sqlite3 = require("sqlite3").verbose();
+const path = require("path");
+const fs = require("fs");
 
-// Connect to the NextRep database
-const db = new sqlite3.Database("./nextrep.db", (err) => {
+// Use the ONE shared NextRep database
+const dbPath = path.join(__dirname, "../database/nextrep.db");
+
+// Use Thomas's full 8-table schema
+const schemaPath = path.join(__dirname, "../database/schema.sql");
+
+const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error("Database connection error:", err.message);
   } else {
@@ -9,44 +16,41 @@ const db = new sqlite3.Database("./nextrep.db", (err) => {
   }
 });
 
-// Create the users table
-db.run(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    first_name TEXT NOT NULL,
-    last_name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    role TEXT NOT NULL CHECK(role IN ('player', 'coach')),
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`, (err) => {
-  if (err) {
-    console.error("Error creating users table:", err.message);
-  } else {
-    console.log("Users table is ready.");
-  }
-});
+function initializeDatabase() {
+  return new Promise((resolve, reject) => {
+    let schema;
 
-// Create the player_profiles table (same columns as Thomas's schema)
-db.run(`
-  CREATE TABLE IF NOT EXISTS player_profiles (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER UNIQUE NOT NULL,
-    jersey_number INTEGER,
-    position TEXT,
-    weight NUMERIC,
-    height NUMERIC,
-    class_year TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  )
-`, (err) => {
-  if (err) {
-    console.error("Error creating player_profiles table:", err.message);
-  } else {
-    console.log("Player profiles table is ready.");
-  }
-});
+    try {
+      schema = fs.readFileSync(schemaPath, "utf8");
+    } catch (err) {
+      console.error("Could not read database/schema.sql:", err.message);
+      return reject(err);
+    }
 
-module.exports = db;
+    db.serialize(() => {
+      // SQLite does not always enforce foreign keys unless this is enabled
+      db.run("PRAGMA foreign_keys = ON", (err) => {
+        if (err) {
+          console.error("Could not enable foreign keys:", err.message);
+          return reject(err);
+        }
+
+        // Run the full schema
+        db.exec(schema, (err) => {
+          if (err) {
+            console.error("Could not initialize database schema:", err.message);
+            return reject(err);
+          }
+
+          console.log("NextRep database schema is ready.");
+          resolve();
+        });
+      });
+    });
+  });
+}
+
+module.exports = {
+  db,
+  initializeDatabase,
+};
