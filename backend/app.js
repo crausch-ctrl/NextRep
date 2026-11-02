@@ -3,6 +3,7 @@ const cors = require("cors");
 const authController = require("./controllers/authController");
 const profileController = require("./controllers/profileController");
 const { requireAuth, requireRole } = require("./middleware/auth");
+const { initializeDatabase } = require("./database");
 
 const app = express();
 const PORT = 3000;
@@ -32,6 +33,12 @@ app.get("/coach-only", requireAuth, requireRole("coach"), (req, res) => {
 app.get("/profile", requireAuth, requireRole("player"), profileController.getProfile);
 app.put("/profile", requireAuth, requireRole("player"), profileController.saveProfile);
 
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
+initializeDatabase()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server running at http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Server not started:", err.message);
+  });

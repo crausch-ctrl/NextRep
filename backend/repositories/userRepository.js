@@ -1,4 +1,4 @@
-const db = require("../database");
+const { db } = require("../database");
 
 // Insert a new user and return the new id
 function createUser(firstName, lastName, email, passwordHash, role) {
