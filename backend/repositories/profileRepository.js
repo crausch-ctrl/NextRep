@@ -1,4 +1,4 @@
-const db = require("../database");
+const { db } = require("../database");
 
 // Get the profile for one user (undefined if they haven't made one yet)
 function findByUserId(userId) {
