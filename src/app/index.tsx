@@ -99,6 +99,7 @@ export default function NextRep() {
   const {width}=useWindowDimensions();
   const wide=width>=850;
 
+  const [showWelcome,setShowWelcome]=useState(true);
   const [role,setRole]=useState<Role>('Player');
   const [logged,setLogged]=useState(false);
   const [email,setEmail]=useState('');
@@ -389,6 +390,31 @@ export default function NextRep() {
         </View>
       </ScrollView>
     </Card>;
+
+    if(showWelcome)
+  return <SafeAreaView style={s.welcomeScreen}>
+    <TouchableOpacity
+      style={s.welcomePress}
+      activeOpacity={1}
+      onPress={()=>setShowWelcome(false)}
+    >
+      <View style={s.welcomeCenter}>
+        <Text style={s.welcomeLogo}>
+          Next<Text style={s.welcomeRep}>Rep</Text>
+        </Text>
+
+        <Text style={s.welcomeTagline}>
+          TRACK   |   IMPROVE   |   COMPETE
+        </Text>
+      </View>
+
+      <Text style={s.welcomeTap}>
+        TAP ANYWHERE TO ENTER
+      </Text>
+    </TouchableOpacity>
+  </SafeAreaView>;
+
+
 
   if(!logged)
     return <SafeAreaView style={s.loginRoot}>
@@ -849,5 +875,48 @@ const s=StyleSheet.create({
   loginTitle:{fontSize:33,fontWeight:'900',color:'#15171c',marginBottom:10},
   roleRow:{flexDirection:'row',borderWidth:1,borderColor:'#e2e4e9',borderRadius:12,overflow:'hidden',marginBottom:25},
   roleButton:{flex:1,alignItems:'center',padding:15},
-  roleSelected:{backgroundColor:MAROON}
+  roleSelected:{backgroundColor:MAROON},
+
+  welcomeScreen:{
+  flex:1,
+  backgroundColor:'#202126'
+},
+
+welcomePress:{
+  flex:1,
+  justifyContent:'center',
+  alignItems:'center'
+},
+
+welcomeCenter:{
+  alignItems:'center'
+},
+
+welcomeLogo:{
+  color:'white',
+  fontSize:70,
+  fontWeight:'900',
+  fontStyle:'italic'
+},
+
+welcomeRep:{
+  color:'#e24d70'
+},
+
+welcomeTagline:{
+  color:'#d3d5d9',
+  letterSpacing:4,
+  fontWeight:'700',
+  marginTop:18,
+  fontSize:13
+},
+
+welcomeTap:{
+  position:'absolute',
+  bottom:45,
+  color:'#8f949c',
+  fontSize:11,
+  fontWeight:'700',
+  letterSpacing:2
+},
 });
