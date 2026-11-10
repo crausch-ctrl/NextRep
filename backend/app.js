@@ -35,7 +35,7 @@ app.put("/profile", requireAuth, requireRole("player"), profileController.savePr
 
 initializeDatabase()
   .then(() => {
-    app.listen(PORT, "0.0.0.0", () => {
+   app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
 });
   })
