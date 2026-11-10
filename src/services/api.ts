@@ -22,6 +22,36 @@ export async function login(email:string,password:string){
   return data;
 }
 
+export async function register(
+  firstName:string,
+  lastName:string,
+  email:string,
+  password:string,
+  role:'player'|'coach'
+){
+  const response=await fetch(`${API_URL}/register`,{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json'
+    },
+    body:JSON.stringify({
+      firstName,
+      lastName,
+      email,
+      password,
+      role
+    })
+  });
+
+  const data=await response.json();
+
+  if(!response.ok){
+    throw new Error(data.error||'Registration failed');
+  }
+
+  return data;
+}
+
 export async function getProfile(token:string){
   const response=await fetch(`${API_URL}/profile`,{
     method:'GET',

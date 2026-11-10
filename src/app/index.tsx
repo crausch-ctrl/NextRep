@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { login, getProfile } from '../services/api';
+import { login, register, getProfile } from '../services/api';
 
 type Role = 'Player' | 'Coach';
 type Metric = 'Squat' | 'Bench' | 'Vertical' | '40 Yard Dash';
@@ -109,6 +109,14 @@ export default function NextRep() {
   const [currentUser,setCurrentUser]=useState<LoggedInUser|null>(null);
   const [loginLoading,setLoginLoading]=useState(false);
 
+  const [authMode,setAuthMode]=useState<'login'|'register'>('login');
+
+const [firstName,setFirstName]=useState('');
+const [lastName,setLastName]=useState('');
+const [confirmPassword,setConfirmPassword]=useState('');
+
+const [registerLoading,setRegisterLoading]=useState(false);
+
   const [page,setPage]=useState('Home');
   const [results,setResults]=useState<Result[]>(initial);
   const [metric,setMetric]=useState<Metric>('Squat');
@@ -186,6 +194,72 @@ export default function NextRep() {
     }
   }
 
+
+  async function handleRegister(){
+  if(
+    !firstName.trim()||
+    !lastName.trim()||
+    !email.trim()||
+    !password.trim()||
+    !confirmPassword.trim()
+  ){
+    Alert.alert(
+      'Missing information',
+      'Please complete all registration fields.'
+    );
+    return;
+  }
+
+  if(password.length<8){
+    Alert.alert(
+      'Password too short',
+      'Password must be at least 8 characters.'
+    );
+    return;
+  }
+
+  if(password!==confirmPassword){
+    Alert.alert(
+      'Passwords do not match',
+      'Make sure both passwords are the same.'
+    );
+    return;
+  }
+
+  try{
+    setRegisterLoading(true);
+
+    await register(
+      firstName.trim(),
+      lastName.trim(),
+      email.trim(),
+      password,
+      role.toLowerCase() as 'player'|'coach'
+    );
+
+    Alert.alert(
+      'Account created',
+      'Your NextRep account was created. You can now log in.'
+    );
+
+    setFirstName('');
+    setLastName('');
+    setPassword('');
+    setConfirmPassword('');
+    setAuthMode('login');
+
+  }catch(error){
+    const message=
+      error instanceof Error
+        ?error.message
+        :'Registration failed';
+
+    Alert.alert('Registration failed',message);
+
+  }finally{
+    setRegisterLoading(false);
+  }
+}
   function handleLogout(){
     setLogged(false);
     setPassword('');
@@ -429,31 +503,55 @@ export default function NextRep() {
             Next<Text style={{color:'#e24d70'}}>Rep</Text>
           </Text>
 
-          <Text style={s.tagline}>TRACK   |   IMPROVE   |   COMPETE</Text>
+          <Text style={s.tagline}>
+  TRACK
+  <Text style={{color:'#e24d70'}}>   |   </Text>
+  IMPROVE
+  <Text style={{color:'#e24d70'}}>   |   </Text>
+  COMPETE
+</Text>
           <Text style={s.motto}>A STRONGER TOMORROW STARTS TODAY.</Text>
-          <Text style={s.brandFoot}>MUHLENBERG FOOTBALL</Text>
+          <Text style={s.brandFoot}> - BECOME BETTER EVERY REP</Text>
         </View>
 
         <View style={[s.loginPanel,{width:wide?'52%':'100%'}]}>
-          <Text style={s.loginTitle}>Welcome to NextRep</Text>
-
-          <Text style={[s.muted,{fontSize:17,marginBottom:28}]}>
-            Log in to track your progress and build your next rep.
+          <Text style={s.loginTitle}>
+            {authMode==='login'?'Welcome to NextRep':'Create Your Account'}
           </Text>
 
-          <View style={s.roleRow}>
-            {(['Player','Coach'] as Role[]).map(r=>
-              <TouchableOpacity
-                key={r}
-                onPress={()=>setRole(r)}
-                style={[s.roleButton,role===r&&s.roleSelected]}
-              >
-                <Text style={[s.bodyBold,role===r&&{color:'white'}]}>
-                  {r}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <Text style={[s.muted,{fontSize:17,marginBottom:28}]}>
+            {authMode==='login'
+              ?'Log in to track your progress and build a Stronger Future!'
+              :'Create your NextRep account to start tracking your progress.'}
+          </Text>
+
+          {authMode==='register'&&<>
+            <View style={s.roleRow}>
+              {(['Player','Coach'] as Role[]).map(r=>
+                <TouchableOpacity
+                  key={r}
+                  onPress={()=>setRole(r)}
+                  style={[s.roleButton,role===r&&s.roleSelected]}
+                >
+                  <Text style={[s.bodyBold,role===r&&{color:'white'}]}>
+                    {r}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <Field
+              label="First Name"
+              value={firstName}
+              onChange={setFirstName}
+            />
+
+            <Field
+              label="Last Name"
+              value={lastName}
+              onChange={setLastName}
+            />
+          </>}
 
           <Field
             label="Email Address"
@@ -469,13 +567,44 @@ export default function NextRep() {
             secure
           />
 
-          <Btn
-            title={loginLoading?'Logging In...':'Log In'}
-            onPress={handleLogin}
-          />
+          {authMode==='register'&&
+            <Field
+              label="Confirm Password"
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+              secure
+            />
+          }
+
+          {authMode==='login'
+            ?<Btn
+                title={loginLoading?'Logging In...':'Log In'}
+                onPress={handleLogin}
+              />
+            :<Btn
+                title={registerLoading?'Creating Account...':'Create Account'}
+                onPress={handleRegister}
+              />
+          }
+
+          <TouchableOpacity
+            onPress={()=>{
+              setPassword('');
+              setConfirmPassword('');
+              setAuthMode(authMode==='login'?'register':'login');
+            }}
+          >
+            <Text style={s.authSwitch}>
+              {authMode==='login'
+                ?"Don't have an account? Create one"
+                :'Already have an account? Log in'}
+            </Text>
+          </TouchableOpacity>
 
           <Text style={s.footnote}>
-            Log in using your NextRep account.
+            {authMode==='login'
+              ?'Log in using your NextRep account.'
+              :'Passwords must be at least 8 characters.'}
           </Text>
         </View>
       </ScrollView>
@@ -876,6 +1005,7 @@ const s=StyleSheet.create({
   roleRow:{flexDirection:'row',borderWidth:1,borderColor:'#e2e4e9',borderRadius:12,overflow:'hidden',marginBottom:25},
   roleButton:{flex:1,alignItems:'center',padding:15},
   roleSelected:{backgroundColor:MAROON},
+  authSwitch:{color:MAROON,fontSize:14,fontWeight:'700',textAlign:'center',marginTop:18},
 
   welcomeScreen:{
   flex:1,
