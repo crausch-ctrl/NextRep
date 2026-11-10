@@ -6,7 +6,7 @@ const { requireAuth, requireRole } = require("./middleware/auth");
 const { initializeDatabase } = require("./database");
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
@@ -35,9 +35,9 @@ app.put("/profile", requireAuth, requireRole("player"), profileController.savePr
 
 initializeDatabase()
   .then(() => {
-    app.listen(PORT, () => {
-      console.log(`Server running at http://localhost:${PORT}`);
-    });
+    app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
+});
   })
   .catch((err) => {
     console.error("Server not started:", err.message);
