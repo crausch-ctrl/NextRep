@@ -42,8 +42,12 @@ async function login(email, password) {
   const user = await userRepo.findByEmail(email);
   // same message for both failures so nobody can tell which part was wrong
   if (!user) {
+   
     throw httpError(401, "Invalid email or password");
   }
+  if (!user.is_active) {
+  throw httpError(403, "Account is inactive");
+}
 
   const match = await bcrypt.compare(password, user.password_hash);
   if (!match) {
