@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 
 const authController = require("./controllers/authController");
+const profileController = require("./controllers/profileController");
 const teamController = require("./controllers/teamController");
 
 const { requireAuth, requireRole } = require("./middleware/auth");
@@ -52,7 +53,23 @@ app.get(
     });
   }
 );
+// --------------------
+// Player profile routes
+// --------------------
 
+app.get(
+  "/profile",
+  requireAuth,
+  requireRole("player"),
+  profileController.getProfile
+);
+
+app.put(
+  "/profile",
+  requireAuth,
+  requireRole("player"),
+  profileController.saveProfile
+);
 
 
 // --------------------
@@ -61,10 +78,10 @@ app.get(
 
 // Coach creates a team
 app.post(
-  "/teams",
+  "/invitations/:inviteId/accept",
   requireAuth,
-  requireRole("coach"),
-  teamController.createTeam
+  requireRole("player"),
+  teamController.acceptInvitation
 );
 
 
