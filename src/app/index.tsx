@@ -57,9 +57,27 @@ const rosterSeed = [
   {name:'Triquil Monroe',pos:'OL',grade:'Sr',squat:495,bench:335,vert:28,dash:5.12},
 ];
 
-const navPlayer = ['Home','Log Numbers','Progress','Goals','Photos','Profile'];
-const navCoach = ['Dashboard','Roster','Testing','Approvals','Team Analytics','Reports','Announcements','Settings'];
+const navPlayer = [
+  'Home',
+  'Team',
+  'Log Numbers',
+  'Progress',
+  'Goals',
+  'Photos',
+  'Profile'
+];
 
+const navCoach = [
+  'Dashboard',
+  'Team',
+  'Roster',
+  'Testing',
+  'Approvals',
+  'Team Analytics',
+  'Reports',
+  'Announcements',
+  'Settings'
+];
 function Btn({title,onPress,outline=false}: {title:string;onPress:()=>void;outline?:boolean}) {
   return <TouchableOpacity onPress={onPress} style={[s.button,outline&&s.outline]}>
     <Text style={[s.buttonText,outline&&{color:MAROON}]}>{title}</Text>
@@ -131,6 +149,9 @@ const [registerLoading,setRegisterLoading]=useState(false);
   });
 
   const [search,setSearch]=useState('');
+  const [inviteEmail,setInviteEmail]=useState('');
+  const [inviteSent,setInviteSent]=useState(false);
+  const [pendingTeamInvite,setPendingTeamInvite]=useState(true);
   const [announcements,setAnnouncements]=useState<string[]>([
     'Welcome to NextRep! Testing day is coming up.'
   ]);
@@ -702,6 +723,59 @@ const [registerLoading,setRegisterLoading]=useState(false);
               onPress={()=>setPage('Log Numbers')}
             />
           </>}
+          {page==='Team'&&<>
+  <Card title="My Team">
+    {pendingTeamInvite ? <>
+      <Text style={s.playerName}>
+        Muhlenberg Football
+      </Text>
+
+      <Text style={s.muted}>
+        You have been invited to join this team.
+      </Text>
+
+      <View style={s.activity}>
+        <View>
+          <Text style={s.bodyBold}>
+            Team Invitation
+          </Text>
+
+          <Text style={s.muted}>
+            Invited by your coach
+          </Text>
+        </View>
+
+        <Text style={s.positive}>
+          Pending
+        </Text>
+      </View>
+
+      <Btn
+        title="Accept Invitation"
+        onPress={()=>{
+          setPendingTeamInvite(false);
+
+          Alert.alert(
+            'Invitation Accepted',
+            'You are now a member of Muhlenberg Football.'
+          );
+        }}
+      />
+    </> : <>
+      <Text style={s.playerName}>
+        Muhlenberg Football
+      </Text>
+
+      <Text style={s.positive}>
+        ✓ Team Member
+      </Text>
+
+      <Text style={s.muted}>
+        You are currently connected to Muhlenberg Football.
+      </Text>
+    </>}
+  </Card>
+</>}
 
           {page==='Log Numbers'&&logForm}
 
@@ -821,6 +895,114 @@ const [registerLoading,setRegisterLoading]=useState(false);
               title="Enter Testing Results"
               onPress={()=>setPage('Testing')}
             />
+          </>}
+
+
+          {page==='Team'&&<>
+            <Card title="Muhlenberg Football">
+              <Text style={s.playerName}>
+                Team Management
+              </Text>
+
+              <Text style={s.muted}>
+                Invite a player to join your NextRep team.
+              </Text>
+
+              <Field
+                label="Player Email Address"
+                value={inviteEmail}
+                onChange={setInviteEmail}
+                keyboardType="email-address"
+              />
+
+              <Btn
+                title="Send Invitation"
+                onPress={()=>{
+                  if(!inviteEmail.trim()){
+                    Alert.alert(
+                      'Missing Email',
+                      'Enter the player email you want to invite.'
+                    );
+                    return;
+                  }
+
+                  setInviteSent(true);
+
+                  Alert.alert(
+                    'Invitation Sent',
+                    `Invitation sent to ${inviteEmail.trim()}`
+                  );
+                }}
+              />
+
+              {inviteSent&&
+                <View style={s.activity}>
+                  <View>
+                    <Text style={s.bodyBold}>
+                      {inviteEmail}
+                    </Text>
+
+                    <Text style={s.muted}>
+                      Team invitation
+                    </Text>
+                  </View>
+
+                  <Text style={s.positive}>
+                    Pending
+                  </Text>
+                </View>
+              }
+            </Card>
+
+            <Card title="Team Members">
+              <View style={s.activity}>
+                <View>
+                  <Text style={s.bodyBold}>
+                    Thomas Cerruti
+                  </Text>
+
+                  <Text style={s.muted}>
+                    Coach
+                  </Text>
+                </View>
+
+                <Text style={s.positive}>
+                  Active
+                </Text>
+              </View>
+
+              <View style={s.activity}>
+                <View>
+                  <Text style={s.bodyBold}>
+                    CJ Newman
+                  </Text>
+
+                  <Text style={s.muted}>
+                    Player • LB
+                  </Text>
+                </View>
+
+                <Text style={s.positive}>
+                  Active
+                </Text>
+              </View>
+
+              <View style={s.activity}>
+                <View>
+                  <Text style={s.bodyBold}>
+                    Leo Dauberman
+                  </Text>
+
+                  <Text style={s.muted}>
+                    Player • DB
+                  </Text>
+                </View>
+
+                <Text style={s.positive}>
+                  Active
+                </Text>
+              </View>
+            </Card>
           </>}
 
           {page==='Roster'&&roster}
