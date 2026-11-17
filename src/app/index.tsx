@@ -1,7 +1,17 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { login, register, getProfile } from '../services/api';
+import {
+  login,
+  register,
+  getProfile,
+  createTeam,
+  getMyTeams,
+  inviteToTeam,
+  getMyInvitations,
+  acceptTeamInvitation,
+  getTeamMembers
+} from '../services/api';
 
 type Role = 'Player' | 'Coach';
 type Metric = 'Squat' | 'Bench' | 'Vertical' | '40 Yard Dash';
@@ -22,6 +32,37 @@ type LoggedInUser = {
   lastName: string;
   email: string;
   role: 'player' | 'coach';
+};
+
+type Team = {
+  id: number;
+  name: string;
+  sport: string | null;
+  created_at?: string;
+};
+
+type TeamInvitation = {
+  id: number;
+  team_id: number;
+  email: string;
+  status: string;
+  created_at: string;
+  expires_at: string;
+  team_name: string;
+  team_sport: string | null;
+  coach_first_name: string;
+  coach_last_name: string;
+};
+
+type TeamMember = {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: 'player' | 'coach';
+  jersey_number: number | null;
+  position: string | null;
+  class_year: string | null;
 };
 
 const MAROON = '#961b3b';
@@ -150,8 +191,13 @@ const [registerLoading,setRegisterLoading]=useState(false);
 
   const [search,setSearch]=useState('');
   const [inviteEmail,setInviteEmail]=useState('');
-  const [inviteSent,setInviteSent]=useState(false);
-  const [pendingTeamInvite,setPendingTeamInvite]=useState(true);
+  const [teamName,setTeamName]=useState('');
+  const [teamSport,setTeamSport]=useState('Football');
+  const [teams,setTeams]=useState<Team[]>([]);
+  const [teamInvitations,setTeamInvitations]=useState<TeamInvitation[]>([]);
+  const [teamMembers,setTeamMembers]=useState<TeamMember[]>([]);
+  const [selectedTeamId,setSelectedTeamId]=useState<number|null>(null);
+  const [teamLoading,setTeamLoading]=useState(false);
   const [announcements,setAnnouncements]=useState<string[]>([
     'Welcome to NextRep! Testing day is coming up.'
   ]);
@@ -173,6 +219,205 @@ const [registerLoading,setRegisterLoading]=useState(false);
   const min=history.length?Math.min(...history.map(r=>r.value)):0;
   const max=history.length?Math.max(...history.map(r=>r.value)):0;
 
+  async function loadTeamData(
+    authToken:string,
+    userRole:'player'|'coach'
+  ){
+    try{
+      setTeamLoading(true);
+
+      const userTeams=await getMyTeams(authToken);
+      setTeams(userTeams);
+
+      const firstTeamId=userTeams.length>0
+        ?userTeams[0].id
+        :null;
+
+      setSelectedTeamId(firstTeamId);
+
+      if(userRole==='player'){
+        const invitations=await getMyInvitations(authToken);
+        setTeamInvitations(invitations);
+        setTeamMembers([]);
+      }else{
+        setTeamInvitations([]);
+
+        if(firstTeamId){
+          const members=await getTeamMembers(
+            authToken,
+            firstTeamId
+          );
+          setTeamMembers(members);
+        }else{
+          setTeamMembers([]);
+        }
+      }
+
+    }catch(error){
+      console.log('Could not load team data:',error);
+      setTeams([]);
+      setTeamInvitations([]);
+      setTeamMembers([]);
+      setSelectedTeamId(null);
+    }finally{
+      setTeamLoading(false);
+    }
+  }
+
+  async function handleCreateTeam(){
+    if(!teamName.trim()){
+      Alert.alert(
+        'Missing Team Name',
+        'Enter a name for your team.'
+      );
+      return;
+    }
+
+    try{
+      setTeamLoading(true);
+
+      const createdTeam=await createTeam(
+        token,
+        teamName.trim(),
+        teamSport.trim()
+      );
+
+      const userTeams=await getMyTeams(token);
+      setTeams(userTeams);
+      setSelectedTeamId(createdTeam.id);
+
+      const members=await getTeamMembers(
+        token,
+        createdTeam.id
+      );
+      setTeamMembers(members);
+
+      setTeamName('');
+
+      Alert.alert(
+        'Team Created',
+        `${createdTeam.name} was created successfully.`
+      );
+
+    }catch(error){
+      const message=
+        error instanceof Error
+          ?error.message
+          :'Could not create team';
+
+      Alert.alert('Team Error',message);
+
+    }finally{
+      setTeamLoading(false);
+    }
+  }
+
+  async function handleSelectTeam(teamId:number){
+    try{
+      setSelectedTeamId(teamId);
+      setTeamLoading(true);
+
+      const members=await getTeamMembers(
+        token,
+        teamId
+      );
+
+      setTeamMembers(members);
+
+    }catch(error){
+      const message=
+        error instanceof Error
+          ?error.message
+          :'Could not load team members';
+
+      Alert.alert('Team Error',message);
+
+    }finally{
+      setTeamLoading(false);
+    }
+  }
+
+  async function handleInvitePlayer(){
+    if(!selectedTeamId){
+      Alert.alert(
+        'No Team Selected',
+        'Create or select a team before inviting a player.'
+      );
+      return;
+    }
+
+    if(!inviteEmail.trim()){
+      Alert.alert(
+        'Missing Email',
+        'Enter the player email you want to invite.'
+      );
+      return;
+    }
+
+    try{
+      setTeamLoading(true);
+
+      const invitation=await inviteToTeam(
+        token,
+        selectedTeamId,
+        inviteEmail.trim()
+      );
+
+      setInviteEmail('');
+
+      Alert.alert(
+        'Invitation Sent',
+        `Invitation created for ${invitation.email}.`
+      );
+
+    }catch(error){
+      const message=
+        error instanceof Error
+          ?error.message
+          :'Could not send invitation';
+
+      Alert.alert('Invitation Error',message);
+
+    }finally{
+      setTeamLoading(false);
+    }
+  }
+
+  async function handleAcceptInvitation(inviteId:number){
+    try{
+      setTeamLoading(true);
+
+      await acceptTeamInvitation(
+        token,
+        inviteId
+      );
+
+      const [userTeams,invitations]=await Promise.all([
+        getMyTeams(token),
+        getMyInvitations(token)
+      ]);
+
+      setTeams(userTeams);
+      setTeamInvitations(invitations);
+
+      Alert.alert(
+        'Invitation Accepted',
+        'You are now a member of the team.'
+      );
+
+    }catch(error){
+      const message=
+        error instanceof Error
+          ?error.message
+          :'Could not accept invitation';
+
+      Alert.alert('Invitation Error',message);
+
+    }finally{
+      setTeamLoading(false);
+    }
+  }
+
   async function handleLogin() {
     if(!email.trim()||!password.trim()){
       Alert.alert('Missing information','Enter your email and password.');
@@ -189,6 +434,7 @@ const [registerLoading,setRegisterLoading]=useState(false);
 
       if(result.user.role==='coach'){
         setRole('Coach');
+        await loadTeamData(result.token,'coach');
         setPage('Dashboard');
         setLogged(true);
         return;
@@ -203,6 +449,8 @@ const [registerLoading,setRegisterLoading]=useState(false);
         console.log('No player profile found yet:',profileError);
         setProfile(null);
       }
+
+      await loadTeamData(result.token,'player');
 
       setPage('Home');
       setLogged(true);
@@ -287,6 +535,12 @@ const [registerLoading,setRegisterLoading]=useState(false);
     setToken('');
     setProfile(null);
     setCurrentUser(null);
+    setTeams([]);
+    setTeamInvitations([]);
+    setTeamMembers([]);
+    setSelectedTeamId(null);
+    setInviteEmail('');
+    setTeamName('');
     setPage('Home');
   }
 
@@ -326,6 +580,11 @@ const [registerLoading,setRegisterLoading]=useState(false);
   }
 
   const nav=role==='Player'?navPlayer:navCoach;
+
+  const selectedTeam=
+    teams.find(t=>t.id===selectedTeamId)
+    ??teams[0]
+    ??null;
 
   const statCards=
     <View style={s.statGrid}>
@@ -724,58 +983,81 @@ const [registerLoading,setRegisterLoading]=useState(false);
             />
           </>}
           {page==='Team'&&<>
-  <Card title="My Team">
-    {pendingTeamInvite ? <>
-      <Text style={s.playerName}>
-        Muhlenberg Football
-      </Text>
+            <Card title="My Team">
+              {teamLoading&&
+                <Text style={s.muted}>
+                  Loading team information...
+                </Text>
+              }
 
-      <Text style={s.muted}>
-        You have been invited to join this team.
-      </Text>
+              {!teamLoading&&teamInvitations.length>0&&<>
+                <Text style={s.playerName}>
+                  Pending Invitations
+                </Text>
 
-      <View style={s.activity}>
-        <View>
-          <Text style={s.bodyBold}>
-            Team Invitation
-          </Text>
+                {teamInvitations.map(invitation=>
+                  <View key={invitation.id} style={s.activity}>
+                    <View style={{flex:1}}>
+                      <Text style={s.bodyBold}>
+                        {invitation.team_name}
+                      </Text>
 
-          <Text style={s.muted}>
-            Invited by your coach
-          </Text>
-        </View>
+                      <Text style={s.muted}>
+                        Invited by {invitation.coach_first_name} {invitation.coach_last_name}
+                      </Text>
 
-        <Text style={s.positive}>
-          Pending
-        </Text>
-      </View>
+                      <Text style={s.muted}>
+                        Expires: {invitation.expires_at}
+                      </Text>
+                    </View>
 
-      <Btn
-        title="Accept Invitation"
-        onPress={()=>{
-          setPendingTeamInvite(false);
+                    <TouchableOpacity
+                      style={s.smallButton}
+                      onPress={()=>
+                        handleAcceptInvitation(invitation.id)
+                      }
+                    >
+                      <Text style={s.smallButtonText}>
+                        Accept
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </>}
 
-          Alert.alert(
-            'Invitation Accepted',
-            'You are now a member of Muhlenberg Football.'
-          );
-        }}
-      />
-    </> : <>
-      <Text style={s.playerName}>
-        Muhlenberg Football
-      </Text>
+              {!teamLoading&&teams.length>0&&<>
+                <Text style={s.playerName}>
+                  My Teams
+                </Text>
 
-      <Text style={s.positive}>
-        ✓ Team Member
-      </Text>
+                {teams.map(team=>
+                  <View key={team.id} style={s.activity}>
+                    <View>
+                      <Text style={s.bodyBold}>
+                        {team.name}
+                      </Text>
 
-      <Text style={s.muted}>
-        You are currently connected to Muhlenberg Football.
-      </Text>
-    </>}
-  </Card>
-</>}
+                      <Text style={s.muted}>
+                        {team.sport||'Sport not set'}
+                      </Text>
+                    </View>
+
+                    <Text style={s.positive}>
+                      ✓ Team Member
+                    </Text>
+                  </View>
+                )}
+              </>}
+
+              {!teamLoading&&
+                teams.length===0&&
+                teamInvitations.length===0&&
+                <Text style={s.muted}>
+                  You do not have any team invitations yet.
+                </Text>
+              }
+            </Card>
+          </>}
 
           {page==='Log Numbers'&&logForm}
 
@@ -899,110 +1181,130 @@ const [registerLoading,setRegisterLoading]=useState(false);
 
 
           {page==='Team'&&<>
-            <Card title="Muhlenberg Football">
-              <Text style={s.playerName}>
-                Team Management
-              </Text>
+            {teamLoading&&
+              <Card title="Team">
+                <Text style={s.muted}>
+                  Loading team information...
+                </Text>
+              </Card>
+            }
 
-              <Text style={s.muted}>
-                Invite a player to join your NextRep team.
-              </Text>
+            {!teamLoading&&teams.length===0&&
+              <Card title="Create Your Team">
+                <Text style={s.muted}>
+                  Create a team before inviting players.
+                </Text>
 
-              <Field
-                label="Player Email Address"
-                value={inviteEmail}
-                onChange={setInviteEmail}
-                keyboardType="email-address"
-              />
+                <Field
+                  label="Team Name"
+                  value={teamName}
+                  onChange={setTeamName}
+                />
 
-              <Btn
-                title="Send Invitation"
-                onPress={()=>{
-                  if(!inviteEmail.trim()){
-                    Alert.alert(
-                      'Missing Email',
-                      'Enter the player email you want to invite.'
-                    );
-                    return;
-                  }
+                <Field
+                  label="Sport"
+                  value={teamSport}
+                  onChange={setTeamSport}
+                />
 
-                  setInviteSent(true);
+                <Btn
+                  title="Create Team"
+                  onPress={handleCreateTeam}
+                />
+              </Card>
+            }
 
-                  Alert.alert(
-                    'Invitation Sent',
-                    `Invitation sent to ${inviteEmail.trim()}`
-                  );
-                }}
-              />
+            {!teamLoading&&teams.length>0&&<>
+              <Card title={selectedTeam?.name||'Team Management'}>
+                {teams.length>1&&<>
+                  <Text style={s.muted}>
+                    Select a team
+                  </Text>
 
-              {inviteSent&&
-                <View style={s.activity}>
-                  <View>
-                    <Text style={s.bodyBold}>
-                      {inviteEmail}
-                    </Text>
-
-                    <Text style={s.muted}>
-                      Team invitation
-                    </Text>
+                  <View style={s.pills}>
+                    {teams.map(team=>
+                      <TouchableOpacity
+                        key={team.id}
+                        style={[
+                          s.pill,
+                          selectedTeamId===team.id&&s.pillActive
+                        ]}
+                        onPress={()=>
+                          handleSelectTeam(team.id)
+                        }
+                      >
+                        <Text
+                          style={[
+                            s.pillText,
+                            selectedTeamId===team.id&&{color:'white'}
+                          ]}
+                        >
+                          {team.name}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
+                </>}
 
-                  <Text style={s.positive}>
-                    Pending
-                  </Text>
-                </View>
-              }
-            </Card>
-
-            <Card title="Team Members">
-              <View style={s.activity}>
-                <View>
-                  <Text style={s.bodyBold}>
-                    Thomas Cerruti
-                  </Text>
-
-                  <Text style={s.muted}>
-                    Coach
-                  </Text>
-                </View>
-
-                <Text style={s.positive}>
-                  Active
+                <Text style={s.playerName}>
+                  Invite Player
                 </Text>
-              </View>
 
-              <View style={s.activity}>
-                <View>
-                  <Text style={s.bodyBold}>
-                    CJ Newman
-                  </Text>
-
-                  <Text style={s.muted}>
-                    Player • LB
-                  </Text>
-                </View>
-
-                <Text style={s.positive}>
-                  Active
+                <Text style={s.muted}>
+                  The invitation is saved in the NextRep database for this email address.
                 </Text>
-              </View>
 
-              <View style={s.activity}>
-                <View>
-                  <Text style={s.bodyBold}>
-                    Leo Dauberman
-                  </Text>
+                <Field
+                  label="Player Email Address"
+                  value={inviteEmail}
+                  onChange={setInviteEmail}
+                  keyboardType="email-address"
+                />
 
-                  <Text style={s.muted}>
-                    Player • DB
-                  </Text>
-                </View>
+                <Btn
+                  title="Send Invitation"
+                  onPress={handleInvitePlayer}
+                />
+              </Card>
 
-                <Text style={s.positive}>
-                  Active
-                </Text>
-              </View>
-            </Card>
+              <Card title="Team Members">
+                {teamMembers.length===0
+                  ?<Text style={s.muted}>
+                      No members found yet.
+                    </Text>
+                  :teamMembers.map(member=>
+                    <View key={member.id} style={s.activity}>
+                      <View>
+                        <Text style={s.bodyBold}>
+                          {member.first_name} {member.last_name}
+                        </Text>
+
+                        <Text style={s.muted}>
+                          {member.role==='coach'
+                            ?'Coach'
+                            :[
+                                'Player',
+                                member.position,
+                                member.jersey_number
+                                  ?`#${member.jersey_number}`
+                                  :null
+                              ].filter(Boolean).join(' • ')
+                          }
+                        </Text>
+
+                        <Text style={s.muted}>
+                          {member.email}
+                        </Text>
+                      </View>
+
+                      <Text style={s.positive}>
+                        Active
+                      </Text>
+                    </View>
+                  )
+                }
+              </Card>
+            </>}
           </>}
 
           {page==='Roster'&&roster}
@@ -1165,6 +1467,8 @@ const s=StyleSheet.create({
   accent:{color:MAROON,fontSize:22,fontWeight:'900'},
   button:{backgroundColor:MAROON,borderRadius:9,padding:14,alignItems:'center',marginTop:7},
   buttonText:{color:'white',fontSize:15,fontWeight:'800'},
+  smallButton:{backgroundColor:MAROON,borderRadius:8,paddingVertical:9,paddingHorizontal:14},
+  smallButtonText:{color:'white',fontSize:12,fontWeight:'800'},
   outline:{backgroundColor:'white',borderColor:MAROON,borderWidth:1},
   fieldLabel:{fontSize:13,color:'#4c525c',marginBottom:5,fontWeight:'600'},
   input:{borderWidth:1,borderColor:'#d5d9e1',backgroundColor:'white',borderRadius:9,padding:13,fontSize:15,color:'#1c2027'},

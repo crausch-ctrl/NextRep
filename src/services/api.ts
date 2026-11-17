@@ -1,7 +1,23 @@
 const API_URL =
   process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
-export async function login(email:string,password:string){
+async function readJson(response:Response){
+  const data=await response.json();
+
+  if(!response.ok){
+    throw new Error(
+      data.error||
+      `Request failed with status ${response.status}`
+    );
+  }
+
+  return data;
+}
+
+export async function login(
+  email:string,
+  password:string
+){
   const response=await fetch(`${API_URL}/login`,{
     method:'POST',
     headers:{
@@ -13,13 +29,7 @@ export async function login(email:string,password:string){
     })
   });
 
-  const data=await response.json();
-
-  if(!response.ok){
-    throw new Error(data.error||'Login failed');
-  }
-
-  return data;
+  return readJson(response);
 }
 
 export async function register(
@@ -43,13 +53,7 @@ export async function register(
     })
   });
 
-  const data=await response.json();
-
-  if(!response.ok){
-    throw new Error(data.error||'Registration failed');
-  }
-
-  return data;
+  return readJson(response);
 }
 
 export async function getProfile(token:string){
@@ -60,11 +64,113 @@ export async function getProfile(token:string){
     }
   });
 
-  const data=await response.json();
-
-  if(!response.ok){
-    throw new Error(data.error||'Could not load profile');
-  }
-
+  const data=await readJson(response);
   return data.profile;
+}
+
+export async function createTeam(
+  token:string,
+  name:string,
+  sport:string
+){
+  const response=await fetch(`${API_URL}/teams`,{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      Authorization:`Bearer ${token}`
+    },
+    body:JSON.stringify({
+      name,
+      sport
+    })
+  });
+
+  const data=await readJson(response);
+  return data.team;
+}
+
+export async function getMyTeams(token:string){
+  const response=await fetch(`${API_URL}/teams/mine`,{
+    method:'GET',
+    headers:{
+      Authorization:`Bearer ${token}`
+    }
+  });
+
+  const data=await readJson(response);
+  return data.teams;
+}
+
+export async function inviteToTeam(
+  token:string,
+  teamId:number,
+  email:string
+){
+  const response=await fetch(
+    `${API_URL}/teams/${teamId}/invitations`,
+    {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        Authorization:`Bearer ${token}`
+      },
+      body:JSON.stringify({
+        email
+      })
+    }
+  );
+
+  const data=await readJson(response);
+  return data.invitation;
+}
+
+export async function getMyInvitations(token:string){
+  const response=await fetch(
+    `${API_URL}/invitations/mine`,
+    {
+      method:'GET',
+      headers:{
+        Authorization:`Bearer ${token}`
+      }
+    }
+  );
+
+  const data=await readJson(response);
+  return data.invitations;
+}
+
+export async function acceptTeamInvitation(
+  token:string,
+  inviteId:number
+){
+  const response=await fetch(
+    `${API_URL}/invitations/${inviteId}/accept`,
+    {
+      method:'POST',
+      headers:{
+        Authorization:`Bearer ${token}`
+      }
+    }
+  );
+
+  const data=await readJson(response);
+  return data.result;
+}
+
+export async function getTeamMembers(
+  token:string,
+  teamId:number
+){
+  const response=await fetch(
+    `${API_URL}/teams/${teamId}/members`,
+    {
+      method:'GET',
+      headers:{
+        Authorization:`Bearer ${token}`
+      }
+    }
+  );
+
+  const data=await readJson(response);
+  return data.members;
 }
