@@ -1,56 +1,70 @@
-const sqlite3 = require("sqlite3").verbose();
+const { Pool } = require("pg");
 const path = require("path");
 const fs = require("fs");
 
-// Use the ONE shared NextRep database
-const dbPath = path.join(__dirname, "../database/nextrep.db");
+// Render stores the PostgreSQL connection
+// information in DATABASE_URL.
+const connectionString =
+  process.env.DATABASE_URL;
 
-// Use Thomas's full 8-table schema
-const schemaPath = path.join(__dirname, "../database/schema.sql");
+if (!connectionString) {
+  console.error(
+    "DATABASE_URL environment variable is missing."
+  );
 
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error("Database connection error:", err.message);
-  } else {
-    console.log("Connected to the NextRep database.");
-  }
+  process.exit(1);
+}
+
+// Create the PostgreSQL connection pool.
+const db = new Pool({
+  connectionString
 });
 
-function initializeDatabase() {
-  return new Promise((resolve, reject) => {
-    let schema;
+// Our SQL schema file.
+const schemaPath = path.join(
+  __dirname,
+  "../database/schema.sql"
+);
 
-    try {
-      schema = fs.readFileSync(schemaPath, "utf8");
-    } catch (err) {
-      console.error("Could not read database/schema.sql:", err.message);
-      return reject(err);
-    }
+// Log database connection problems.
+db.on("error", (err) => {
+  console.error(
+    "PostgreSQL database error:",
+    err.message
+  );
+});
 
-    db.serialize(() => {
-      // SQLite does not always enforce foreign keys unless this is enabled
-      db.run("PRAGMA foreign_keys = ON", (err) => {
-        if (err) {
-          console.error("Could not enable foreign keys:", err.message);
-          return reject(err);
-        }
+// Create the database tables when
+// the backend starts.
+async function initializeDatabase() {
+  try {
+    const schema =
+      fs.readFileSync(
+        schemaPath,
+        "utf8"
+      );
 
-        // Run the full schema
-        db.exec(schema, (err) => {
-          if (err) {
-            console.error("Could not initialize database schema:", err.message);
-            return reject(err);
-          }
+    await db.query(schema);
 
-          console.log("NextRep database schema is ready.");
-          resolve();
-        });
-      });
-    });
-  });
+    console.log(
+      "Connected to the NextRep PostgreSQL database."
+    );
+
+    console.log(
+      "NextRep PostgreSQL schema is ready."
+    );
+
+  } catch (err) {
+    console.error(
+      "Could not initialize PostgreSQL database:",
+      err
+    );
+
+    throw err;
+  }
 }
 
 module.exports = {
   db,
-  initializeDatabase,
+  initializeDatabase
 };

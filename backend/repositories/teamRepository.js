@@ -1,307 +1,401 @@
 const { db } = require("../database");
 
-function createTeam(name, sport) {
-  return new Promise((resolve, reject) => {
-    const sql = `
-      INSERT INTO teams (name, sport)
-      VALUES (?, ?)
-    `;
+// ------------------------------------
+// Create a team
+// ------------------------------------
 
-    db.run(sql, [name, sport], function (err) {
-      if (err) return reject(err);
+async function createTeam(name, sport) {
+  const result = await db.query(
+    `
+    INSERT INTO teams
+    (
+      name,
+      sport
+    )
+    VALUES ($1, $2)
+    RETURNING id
+    `,
+    [name, sport]
+  );
 
-      resolve({
-        id: this.lastID
-      });
-    });
-  });
+  return {
+    id: result.rows[0].id
+  };
 }
 
-function findTeamById(teamId) {
-  return new Promise((resolve, reject) => {
-    db.get(
-      "SELECT * FROM teams WHERE id = ?",
-      [teamId],
-      (err, row) => {
-        if (err) return reject(err);
-        resolve(row);
-      }
-    );
-  });
+
+// ------------------------------------
+// Find a team by ID
+// ------------------------------------
+
+async function findTeamById(teamId) {
+  const result = await db.query(
+    `
+    SELECT *
+    FROM teams
+    WHERE id = $1
+    `,
+    [teamId]
+  );
+
+  return result.rows[0];
 }
 
-function addMembership(userId, teamId) {
-  return new Promise((resolve, reject) => {
-    const sql = `
-      INSERT OR IGNORE INTO team_memberships
-      (user_id, team_id)
-      VALUES (?, ?)
-    `;
 
-    db.run(sql, [userId, teamId], function (err) {
-      if (err) return reject(err);
+// ------------------------------------
+// Add user to a team
+// ------------------------------------
 
-      resolve({
-        id: this.lastID
-      });
-    });
-  });
+async function addMembership(
+  userId,
+  teamId
+) {
+  const result = await db.query(
+    `
+    INSERT INTO team_memberships
+    (
+      user_id,
+      team_id
+    )
+    VALUES ($1, $2)
+
+    ON CONFLICT (user_id, team_id)
+    DO NOTHING
+
+    RETURNING id
+    `,
+    [
+      userId,
+      teamId
+    ]
+  );
+
+  return {
+    id:
+      result.rows.length > 0
+        ? result.rows[0].id
+        : null
+  };
 }
 
-function findMembership(userId, teamId) {
-  return new Promise((resolve, reject) => {
-    const sql = `
-      SELECT *
-      FROM team_memberships
-      WHERE user_id = ?
-      AND team_id = ?
-    `;
 
-    db.get(sql, [userId, teamId], (err, row) => {
-      if (err) return reject(err);
+// ------------------------------------
+// Find membership
+// ------------------------------------
 
-      resolve(row);
-    });
-  });
+async function findMembership(
+  userId,
+  teamId
+) {
+  const result = await db.query(
+    `
+    SELECT *
+    FROM team_memberships
+    WHERE user_id = $1
+    AND team_id = $2
+    `,
+    [
+      userId,
+      teamId
+    ]
+  );
+
+  return result.rows[0];
 }
 
-function findTeamsForUser(userId) {
-  return new Promise((resolve, reject) => {
-    const sql = `
-      SELECT
-        teams.id,
-        teams.name,
-        teams.sport,
-        teams.created_at
-      FROM teams
-      JOIN team_memberships
-        ON teams.id = team_memberships.team_id
-      WHERE team_memberships.user_id = ?
-      ORDER BY teams.name
-    `;
 
-    db.all(sql, [userId], (err, rows) => {
-      if (err) return reject(err);
+// ------------------------------------
+// Find all teams for one user
+// ------------------------------------
 
-      resolve(rows);
-    });
-  });
+async function findTeamsForUser(userId) {
+  const result = await db.query(
+    `
+    SELECT
+      teams.id,
+      teams.name,
+      teams.sport,
+      teams.created_at
+
+    FROM teams
+
+    JOIN team_memberships
+      ON teams.id =
+         team_memberships.team_id
+
+    WHERE team_memberships.user_id = $1
+
+    ORDER BY teams.name
+    `,
+    [userId]
+  );
+
+  return result.rows;
 }
 
-function findActiveInvitation(teamId, email) {
-  return new Promise((resolve, reject) => {
-    const sql = `
-      SELECT *
-      FROM invitations
-      WHERE team_id = ?
-      AND LOWER(email) = LOWER(?)
-      AND status = 'pending'
-      AND datetime(expires_at) > datetime('now')
-    `;
 
-    db.get(
-      sql,
-      [teamId, email],
-      (err, row) => {
-        if (err) return reject(err);
+// ------------------------------------
+// Find active invitation
+// ------------------------------------
 
-        resolve(row);
-      }
-    );
-  });
+async function findActiveInvitation(
+  teamId,
+  email
+) {
+  const result = await db.query(
+    `
+    SELECT *
+    FROM invitations
+
+    WHERE team_id = $1
+
+    AND LOWER(email) =
+        LOWER($2)
+
+    AND status = 'pending'
+
+    AND expires_at >
+        CURRENT_TIMESTAMP
+    `,
+    [
+      teamId,
+      email
+    ]
+  );
+
+  return result.rows[0];
 }
 
-function createInvitation(
+
+// ------------------------------------
+// Create invitation
+// ------------------------------------
+
+async function createInvitation(
   teamId,
   email,
   invitedBy,
   expiresAt
 ) {
-  return new Promise((resolve, reject) => {
-    const sql = `
-      INSERT INTO invitations
-      (
-        team_id,
-        email,
-        invited_by,
-        status,
-        expires_at
-      )
-      VALUES (?, ?, ?, 'pending', ?)
-    `;
+  const result = await db.query(
+    `
+    INSERT INTO invitations
+    (
+      team_id,
+      email,
+      invited_by,
+      status,
+      expires_at
+    )
 
-    db.run(
-      sql,
-      [
-        teamId,
-        email,
-        invitedBy,
-        expiresAt
-      ],
-      function (err) {
-        if (err) return reject(err);
+    VALUES (
+      $1,
+      $2,
+      $3,
+      'pending',
+      $4
+    )
 
-        resolve({
-          id: this.lastID
-        });
-      }
-    );
-  });
+    RETURNING id
+    `,
+    [
+      teamId,
+      email,
+      invitedBy,
+      expiresAt
+    ]
+  );
+
+  return {
+    id: result.rows[0].id
+  };
 }
 
-function findInvitationsForEmail(email) {
-  return new Promise((resolve, reject) => {
-    const sql = `
-      SELECT
-        invitations.id,
-        invitations.team_id,
-        invitations.email,
-        invitations.status,
-        invitations.created_at,
-        invitations.expires_at,
 
-        teams.name AS team_name,
-        teams.sport AS team_sport,
+// ------------------------------------
+// Find invitations for an email
+// ------------------------------------
 
-        users.first_name AS coach_first_name,
-        users.last_name AS coach_last_name
+async function findInvitationsForEmail(
+  email
+) {
+  const result = await db.query(
+    `
+    SELECT
+      invitations.id,
+      invitations.team_id,
+      invitations.email,
+      invitations.status,
+      invitations.created_at,
+      invitations.expires_at,
 
-      FROM invitations
+      teams.name AS team_name,
+      teams.sport AS team_sport,
 
-      JOIN teams
-        ON invitations.team_id = teams.id
+      users.first_name AS coach_first_name,
+      users.last_name AS coach_last_name
 
-      JOIN users
-        ON invitations.invited_by = users.id
+    FROM invitations
 
-      WHERE LOWER(invitations.email) = LOWER(?)
-      AND invitations.status = 'pending'
-      AND datetime(invitations.expires_at) > datetime('now')
+    JOIN teams
+      ON invitations.team_id =
+         teams.id
 
-      ORDER BY invitations.created_at DESC
-    `;
+    JOIN users
+      ON invitations.invited_by =
+         users.id
 
-    db.all(sql, [email], (err, rows) => {
-      if (err) return reject(err);
+    WHERE LOWER(invitations.email) =
+          LOWER($1)
 
-      resolve(rows);
-    });
-  });
+    AND invitations.status =
+        'pending'
+
+    AND invitations.expires_at >
+        CURRENT_TIMESTAMP
+
+    ORDER BY
+      invitations.created_at DESC
+    `,
+    [email]
+  );
+
+  return result.rows;
 }
 
-function findPendingInvitation(inviteId, email) {
-  return new Promise((resolve, reject) => {
-    const sql = `
-      SELECT *
-      FROM invitations
-      WHERE id = ?
-      AND LOWER(email) = LOWER(?)
-      AND status = 'pending'
-      AND datetime(expires_at) > datetime('now')
-    `;
 
-    db.get(
-      sql,
-      [inviteId, email],
-      (err, row) => {
-        if (err) return reject(err);
+// ------------------------------------
+// Find pending invitation
+// ------------------------------------
 
-        resolve(row);
-      }
-    );
-  });
+async function findPendingInvitation(
+  inviteId,
+  email
+) {
+  const result = await db.query(
+    `
+    SELECT *
+    FROM invitations
+
+    WHERE id = $1
+
+    AND LOWER(email) =
+        LOWER($2)
+
+    AND status = 'pending'
+
+    AND expires_at >
+        CURRENT_TIMESTAMP
+    `,
+    [
+      inviteId,
+      email
+    ]
+  );
+
+  return result.rows[0];
 }
 
-function acceptInvitation(
+
+// ------------------------------------
+// Accept invitation
+// ------------------------------------
+
+async function acceptInvitation(
   inviteId,
   userId,
   teamId
 ) {
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      db.run("BEGIN TRANSACTION");
+  const client =
+    await db.connect();
 
-      db.run(
-        `
-        INSERT OR IGNORE INTO team_memberships
-        (user_id, team_id)
-        VALUES (?, ?)
-        `,
-        [userId, teamId],
-        (membershipError) => {
-          if (membershipError) {
-            db.run("ROLLBACK");
-            return reject(membershipError);
-          }
+  try {
+    await client.query("BEGIN");
 
-          db.run(
-            `
-            UPDATE invitations
-            SET status = 'accepted'
-            WHERE id = ?
-            `,
-            [inviteId],
-            (inviteError) => {
-              if (inviteError) {
-                db.run("ROLLBACK");
-                return reject(inviteError);
-              }
+    await client.query(
+      `
+      INSERT INTO team_memberships
+      (
+        user_id,
+        team_id
+      )
+      VALUES ($1, $2)
 
-              db.run(
-                "COMMIT",
-                (commitError) => {
-                  if (commitError) {
-                    return reject(commitError);
-                  }
-
-                  resolve();
-                }
-              );
-            }
-          );
-        }
-      );
-    });
-  });
-}
-
-function findTeamMembers(teamId) {
-  return new Promise((resolve, reject) => {
-    const sql = `
-      SELECT
-        users.id,
-        users.first_name,
-        users.last_name,
-        users.email,
-        users.role,
-        player_profiles.jersey_number,
-        player_profiles.position,
-        player_profiles.class_year
-
-      FROM team_memberships
-
-      JOIN users
-        ON team_memberships.user_id = users.id
-
-      LEFT JOIN player_profiles
-        ON users.id = player_profiles.user_id
-
-      WHERE team_memberships.team_id = ?
-
-      ORDER BY users.last_name, users.first_name
-    `;
-
-    db.all(
-      sql,
-      [teamId],
-      (err, rows) => {
-        if (err) return reject(err);
-
-        resolve(rows);
-      }
+      ON CONFLICT (user_id, team_id)
+      DO NOTHING
+      `,
+      [
+        userId,
+        teamId
+      ]
     );
-  });
+
+    await client.query(
+      `
+      UPDATE invitations
+      SET status = 'accepted'
+      WHERE id = $1
+      `,
+      [inviteId]
+    );
+
+    await client.query("COMMIT");
+
+  } catch (err) {
+    await client.query("ROLLBACK");
+
+    throw err;
+
+  } finally {
+    client.release();
+  }
 }
+
+
+// ------------------------------------
+// Get team members
+// ------------------------------------
+
+async function findTeamMembers(teamId) {
+  const result = await db.query(
+    `
+    SELECT
+      users.id,
+      users.first_name,
+      users.last_name,
+      users.email,
+      users.role,
+
+      player_profiles.jersey_number,
+      player_profiles.position,
+      player_profiles.class_year
+
+    FROM team_memberships
+
+    JOIN users
+      ON team_memberships.user_id =
+         users.id
+
+    LEFT JOIN player_profiles
+      ON users.id =
+         player_profiles.user_id
+
+    WHERE team_memberships.team_id = $1
+
+    ORDER BY
+      users.last_name,
+      users.first_name
+    `,
+    [teamId]
+  );
+
+  return result.rows;
+}
+
+
+// ------------------------------------
+// Exports
+// ------------------------------------
 
 module.exports = {
   createTeam,

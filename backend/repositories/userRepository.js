@@ -1,79 +1,89 @@
 const { db } = require("../database");
 
-// Insert a new user and return the new id
-function createUser(
+// ------------------------------------
+// Create a new user
+// ------------------------------------
+
+async function createUser(
   firstName,
   lastName,
   email,
   passwordHash,
   role
 ) {
-  return new Promise((resolve, reject) => {
-    const sql = `
-      INSERT INTO users
-      (
-        first_name,
-        last_name,
-        email,
-        password_hash,
-        role
-      )
-      VALUES (?, ?, ?, ?, ?)
-    `;
+  const sql = `
+    INSERT INTO users
+    (
+      first_name,
+      last_name,
+      email,
+      password_hash,
+      role
+    )
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING id
+  `;
 
-    db.run(
-      sql,
-      [
-        firstName,
-        lastName,
-        email,
-        passwordHash,
-        role
-      ],
-      function (err) {
-        if (err) return reject(err);
+  const result = await db.query(
+    sql,
+    [
+      firstName,
+      lastName,
+      email,
+      passwordHash,
+      role
+    ]
+  );
 
-        resolve({
-          id: this.lastID
-        });
-      }
-    );
-  });
+  return {
+    id: result.rows[0].id
+  };
 }
 
-// Find a user by email
-function findByEmail(email) {
-  return new Promise((resolve, reject) => {
-    db.get(
-      `
-      SELECT *
-      FROM users
-      WHERE LOWER(email) = LOWER(?)
-      `,
-      [email],
-      (err, row) => {
-        if (err) return reject(err);
 
-        resolve(row);
-      }
-    );
-  });
+// ------------------------------------
+// Find user by email
+// ------------------------------------
+
+async function findByEmail(email) {
+  const sql = `
+    SELECT *
+    FROM users
+    WHERE LOWER(email) = LOWER($1)
+  `;
+
+  const result = await db.query(
+    sql,
+    [email]
+  );
+
+  return result.rows[0];
 }
 
-// Find a user by their id
-function findById(id) {
-  return new Promise((resolve, reject) => {
-    db.get(
-      "SELECT * FROM users WHERE id = ?",
-      [id],
-      (err, row) => {
-        if (err) return reject(err);
 
-        resolve(row);
-      }
-    );
-  });
+// ------------------------------------
+// Find user by ID
+// ------------------------------------
+
+async function findById(id) {
+  const sql = `
+    SELECT *
+    FROM users
+    WHERE id = $1
+  `;
+
+  const result = await db.query(
+    sql,
+    [id]
+  );
+
+  return result.rows[0];
 }
+
+
+// ------------------------------------
+// Exports
+// ------------------------------------
 
 module.exports = {
   createUser,

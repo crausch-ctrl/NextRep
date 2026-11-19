@@ -10,12 +10,10 @@ function httpError(status, message) {
   return err;
 }
 
-function formatSQLiteDate(date) {
-  return date
-    .toISOString()
-    .slice(0, 19)
-    .replace("T", " ");
-}
+
+// ------------------------------------
+// Create team
+// ------------------------------------
 
 async function createTeam(
   coachId,
@@ -44,11 +42,11 @@ async function createTeam(
         cleanName,
         cleanSport
       );
+
   } catch (err) {
-    if (
-      err.message &&
-      err.message.includes("UNIQUE")
-    ) {
+
+    // PostgreSQL unique constraint error
+    if (err.code === "23505") {
       throw httpError(
         409,
         "A team with that name already exists"
@@ -70,9 +68,21 @@ async function createTeam(
   };
 }
 
+
+// ------------------------------------
+// Get user's teams
+// ------------------------------------
+
 async function getMyTeams(userId) {
-  return teamRepo.findTeamsForUser(userId);
+  return teamRepo.findTeamsForUser(
+    userId
+  );
 }
+
+
+// ------------------------------------
+// Invite player to team
+// ------------------------------------
 
 async function inviteToTeam(
   coachId,
@@ -90,7 +100,9 @@ async function inviteToTeam(
     email.trim().toLowerCase();
 
   const team =
-    await teamRepo.findTeamById(teamId);
+    await teamRepo.findTeamById(
+      teamId
+    );
 
   if (!team) {
     throw httpError(
@@ -126,7 +138,9 @@ async function inviteToTeam(
   }
 
   const existingUser =
-    await userRepo.findByEmail(cleanEmail);
+    await userRepo.findByEmail(
+      cleanEmail
+    );
 
   if (existingUser) {
     const membership =
@@ -143,14 +157,12 @@ async function inviteToTeam(
     }
   }
 
-  const expires =
+  // Invitation expires 7 days from now
+  const expiresAt =
     new Date(
       Date.now() +
       7 * 24 * 60 * 60 * 1000
     );
-
-  const expiresAt =
-    formatSQLiteDate(expires);
 
   const result =
     await teamRepo.createInvitation(
@@ -170,9 +182,16 @@ async function inviteToTeam(
   };
 }
 
+
+// ------------------------------------
+// Get user's invitations
+// ------------------------------------
+
 async function getMyInvitations(userId) {
   const user =
-    await userRepo.findById(userId);
+    await userRepo.findById(
+      userId
+    );
 
   if (!user) {
     throw httpError(
@@ -186,12 +205,19 @@ async function getMyInvitations(userId) {
   );
 }
 
+
+// ------------------------------------
+// Accept invitation
+// ------------------------------------
+
 async function acceptInvitation(
   userId,
   inviteId
 ) {
   const user =
-    await userRepo.findById(userId);
+    await userRepo.findById(
+      userId
+    );
 
   if (!user) {
     throw httpError(
@@ -233,17 +259,27 @@ async function acceptInvitation(
   );
 
   return {
-    teamId: invitation.team_id,
-    status: "accepted"
+    teamId:
+      invitation.team_id,
+
+    status:
+      "accepted"
   };
 }
+
+
+// ------------------------------------
+// Get team members
+// ------------------------------------
 
 async function getTeamMembers(
   coachId,
   teamId
 ) {
   const team =
-    await teamRepo.findTeamById(teamId);
+    await teamRepo.findTeamById(
+      teamId
+    );
 
   if (!team) {
     throw httpError(
@@ -265,8 +301,11 @@ async function getTeamMembers(
     );
   }
 
-  return teamRepo.findTeamMembers(teamId);
+  return teamRepo.findTeamMembers(
+    teamId
+  );
 }
+
 
 module.exports = {
   createTeam,
