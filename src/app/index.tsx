@@ -802,7 +802,7 @@ const [registerLoading,setRegisterLoading]=useState(false);
           <Text style={[s.muted,{fontSize:17,marginBottom:28}]}>
             {authMode==='login'
               ?'Log in to track your progress and build a Stronger Future!'
-              :'Cretae an account and lets get started on your journey. '}
+              :'Create your NextRep account to start tracking your progress. '}
           </Text>
 
           {authMode==='register'&&<>
