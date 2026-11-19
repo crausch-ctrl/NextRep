@@ -758,7 +758,7 @@ const [registerLoading,setRegisterLoading]=useState(false);
         </Text>
 
         <Text style={s.welcomeTagline}>
-          TRACK   |   IMPROVE   |   COMPETE
+          TRACK   |   IMPROVE   |   COMPETE | Have Fun
         </Text>
       </View>
 
