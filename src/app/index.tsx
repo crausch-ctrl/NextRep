@@ -758,7 +758,7 @@ const [registerLoading,setRegisterLoading]=useState(false);
         </Text>
 
         <Text style={s.welcomeTagline}>
-          TRACK   |   IMPROVE   |   COMPETE | Have Fun
+          TRACK   |   IMPROVE   |   COMPETE
         </Text>
       </View>
 
@@ -801,8 +801,8 @@ const [registerLoading,setRegisterLoading]=useState(false);
 
           <Text style={[s.muted,{fontSize:17,marginBottom:28}]}>
             {authMode==='login'
-              ?'Log in to track your progress and build a Stronger Future!'
-              :'Create your NextRep account to start tracking your progress.'}
+              ?'Log in to track your progress and build a Stronger Future! Have fun'
+              :'Create your NextRep account to start tracking your progress. '}
           </Text>
 
           {authMode==='register'&&<>
