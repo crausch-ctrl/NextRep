@@ -10,12 +10,29 @@ import {
   inviteToTeam,
   getMyInvitations,
   acceptTeamInvitation,
-  getTeamMembers
+  getTeamMembers,
+  getMyPerformanceResults,
+  logPerformanceResult,
+  getMyGoals,
+  saveMyGoal
 } from '../services/api';
 
 type Role = 'Player' | 'Coach';
-type Metric = 'Squat' | 'Bench' | 'Vertical' | '40 Yard Dash';
-type Result = { metric: Metric; value: number; date: string };
+type Metric =
+  | 'Squat'
+  | 'Bench'
+  | 'Hang Clean'
+  | 'Vertical'
+  | '40 Yard Dash'
+  | '3 Cone Drill'
+  | 'L Drill';
+type Result = {
+  id:number;
+  metric:Metric;
+  value:number;
+  status:string;
+  recordedAt:string;
+};
 
 type PlayerProfile = {
   userId: number;
@@ -66,29 +83,28 @@ type TeamMember = {
 };
 
 const MAROON = '#961b3b';
+const metrics:Metric[]=[
+  'Squat',
+  'Bench',
+  'Hang Clean',
+  'Vertical',
+  '40 Yard Dash',
+  '3 Cone Drill',
+  'L Drill'
+];
 
-const metrics: Metric[] = ['Squat','Bench','Vertical','40 Yard Dash'];
 
-const units: Record<Metric,string> = {
+const units:Record<Metric,string>={
   Squat:'lbs',
   Bench:'lbs',
+  'Hang Clean':'lbs',
   Vertical:'in',
-  '40 Yard Dash':'sec'
+  '40 Yard Dash':'sec',
+  '3 Cone Drill':'sec',
+  'L Drill':'sec'
 };
 
-const initial: Result[] = [
-  {metric:'Squat',value:350,date:'2026-01-15'},
-  {metric:'Squat',value:375,date:'2026-03-15'},
-  {metric:'Squat',value:405,date:'2026-05-15'},
-  {metric:'Squat',value:425,date:'2026-09-15'},
-  {metric:'Bench',value:245,date:'2026-01-15'},
-  {metric:'Bench',value:265,date:'2026-04-15'},
-  {metric:'Bench',value:295,date:'2026-09-15'},
-  {metric:'Vertical',value:30,date:'2026-01-15'},
-  {metric:'Vertical',value:34,date:'2026-09-15'},
-  {metric:'40 Yard Dash',value:4.84,date:'2026-01-15'},
-  {metric:'40 Yard Dash',value:4.68,date:'2026-09-15'},
-];
+
 
 const rosterSeed = [
   {name:'Thomas Cerruti',pos:'LB',grade:'Sr',squat:425,bench:295,vert:34,dash:4.68},
@@ -177,17 +193,14 @@ const [confirmPassword,setConfirmPassword]=useState('');
 const [registerLoading,setRegisterLoading]=useState(false);
 
   const [page,setPage]=useState('Home');
-  const [results,setResults]=useState<Result[]>(initial);
+  const [results,setResults]=useState<Result[]>([]);
   const [metric,setMetric]=useState<Metric>('Squat');
   const [value,setValue]=useState('');
   const [goalMetric,setGoalMetric]=useState<Metric>('Squat');
   const [goalValue,setGoalValue]=useState('');
-  const [goals,setGoals]=useState<Record<Metric,number>>({
-    Squat:450,
-    Bench:315,
-    Vertical:36,
-    '40 Yard Dash':4.6
-  });
+  const [goals,setGoals]=useState<
+    Partial<Record<Metric,number>>
+  >({});
 
   const [search,setSearch]=useState('');
   const [inviteEmail,setInviteEmail]=useState('');
@@ -209,9 +222,9 @@ const [registerLoading,setRegisterLoading]=useState(false);
     Object.fromEntries(
       metrics.map(m=>[
         m,
-        results.filter(r=>r.metric===m).slice(-1)[0]?.value??0
+        results.filter(r=>r.metric===m).slice(-1)[0]?.value
       ])
-    ) as Record<Metric,number>,
+    ) as Partial<Record<Metric,number>>,
     [results]
   );
 
@@ -263,7 +276,54 @@ const [registerLoading,setRegisterLoading]=useState(false);
       setTeamLoading(false);
     }
   }
+async function loadPlayerPerformanceData(
+  authToken:string
+){
+  try{
+    const [
+      savedResults,
+      savedGoals
+    ]=await Promise.all([
+      getMyPerformanceResults(authToken),
+      getMyGoals(authToken)
+    ]);
 
+    const cleanResults:Result[]=
+      savedResults.map((r:any)=>({
+        id:r.id,
+        metric:r.metric as Metric,
+        value:Number(r.value),
+        status:r.status,
+        recordedAt:r.recordedAt
+      }));
+
+    setResults(cleanResults);
+
+    const goalMap:
+      Partial<Record<Metric,number>>={};
+
+    savedGoals.forEach((g:any)=>{
+      const goalMetric=
+        g.metric as Metric;
+
+      if(metrics.includes(goalMetric)){
+        goalMap[goalMetric]=
+          Number(g.targetValue);
+      }
+    });
+
+    setGoals(goalMap);
+
+  }catch(error){
+    console.log(
+      'Could not load player performance:',
+      error
+    );
+
+    setResults([]);
+    setGoals({});
+  }
+}
   async function handleCreateTeam(){
     if(!teamName.trim()){
       Alert.alert(
@@ -442,6 +502,10 @@ const [registerLoading,setRegisterLoading]=useState(false);
 
       setRole('Player');
 
+      await loadPlayerPerformanceData(
+        result.token
+      );
+
       try{
         const playerProfile=await getProfile(result.token);
         setProfile(playerProfile);
@@ -541,42 +605,126 @@ const [registerLoading,setRegisterLoading]=useState(false);
     setSelectedTeamId(null);
     setInviteEmail('');
     setTeamName('');
+    setResults([]);
+    setGoals({});
+    setValue('');
+    setGoalValue('');
     setPage('Home');
   }
 
-  function saveResult(){
+  async function saveResult(){
     const n=Number(value);
 
-    if(!value.trim()||!Number.isFinite(n)||n<=0){
-      Alert.alert('Invalid result','Enter a positive number.');
+    if(
+      !value.trim()||
+      !Number.isFinite(n)||
+      n<=0
+    ){
+      Alert.alert(
+        'Invalid result',
+        'Enter a positive number.'
+      );
+
       return;
     }
 
-    setResults(v=>[
-      ...v,
-      {
-        metric,
-        value:n,
-        date:new Date().toISOString().slice(0,10)
-      }
-    ]);
+    if(role!=='Player'){
+      Alert.alert(
+        'Player Logging Only',
+        'Coach testing entry will be connected separately.'
+      );
 
-    setValue('');
-    setPage(role==='Player'?'Home':'Testing');
+      return;
+    }
 
-    Alert.alert('Saved','Result added to this demo session.');
+    try{
+      const saved=
+        await logPerformanceResult(
+          token,
+          metric,
+          n
+        );
+
+      setResults(current=>[
+        ...current,
+        {
+          id:saved.id,
+          metric:saved.metric as Metric,
+          value:Number(saved.value),
+          status:saved.status,
+          recordedAt:saved.recordedAt
+        }
+      ]);
+
+      setValue('');
+      setPage('Home');
+
+      Alert.alert(
+        'Result Saved',
+        `${metric} was saved to your account.`
+      );
+
+    }catch(error){
+      const message=
+        error instanceof Error
+          ?error.message
+          :'Could not save result';
+
+      Alert.alert(
+        'Save Error',
+        message
+      );
+    }
   }
 
-  function saveGoal(){
+  async function saveGoal(){
     const n=Number(goalValue);
 
-    if(!goalValue.trim()||!Number.isFinite(n)||n<=0){
-      Alert.alert('Invalid goal','Enter a positive number.');
+    if(
+      !goalValue.trim()||
+      !Number.isFinite(n)||
+      n<=0
+    ){
+      Alert.alert(
+        'Invalid goal',
+        'Enter a positive number.'
+      );
+
       return;
     }
 
-    setGoals(v=>({...v,[goalMetric]:n}));
-    setGoalValue('');
+    try{
+      const saved=
+        await saveMyGoal(
+          token,
+          goalMetric,
+          n
+        );
+
+      setGoals(current=>({
+        ...current,
+        [saved.metric]:
+          Number(saved.targetValue)
+      }));
+
+      setGoalValue('');
+
+      Alert.alert(
+        'Goal Saved',
+        `${saved.metric} goal saved.`
+      );
+
+    }catch(error){
+      const message=
+        error instanceof Error
+          ?error.message
+          :'Could not save goal';
+
+      Alert.alert(
+        'Goal Error',
+        message
+      );
+    }
   }
 
   const nav=role==='Player'?navPlayer:navCoach;
@@ -588,15 +736,39 @@ const [registerLoading,setRegisterLoading]=useState(false);
 
   const statCards=
     <View style={s.statGrid}>
-      {metrics.map(m=>
-        <View key={m} style={s.stat}>
+      {metrics.map(m=>{
+        const current=latest[m];
+
+        return <View key={m} style={s.stat}>
           <Text style={s.muted}>{m}</Text>
+
           <Text style={s.statNumber}>
-            {latest[m]} <Text style={s.statUnit}>{units[m]}</Text>
+            {current===undefined
+              ?'—'
+              :current
+            }
+
+            {current!==undefined&&
+              <Text style={s.statUnit}>
+                {' '}{units[m]}
+              </Text>
+            }
           </Text>
-          <Text style={s.positive}>● Latest result</Text>
-        </View>
-      )}
+
+          <Text
+            style={
+              current===undefined
+                ?s.muted
+                :s.positive
+            }
+          >
+            {current===undefined
+              ?'No result logged yet'
+              :'● Latest result'
+            }
+          </Text>
+        </View>;
+      })}
     </View>;
 
   const progress=
@@ -605,82 +777,158 @@ const [registerLoading,setRegisterLoading]=useState(false);
         {metrics.map(m=>
           <TouchableOpacity
             key={m}
-            style={[s.pill,metric===m&&s.pillActive]}
+            style={[
+              s.pill,
+              metric===m&&s.pillActive
+            ]}
             onPress={()=>setMetric(m)}
           >
-            <Text style={[s.pillText,metric===m&&{color:'white'}]}>{m}</Text>
+            <Text
+              style={[
+                s.pillText,
+                metric===m&&{color:'white'}
+              ]}
+            >
+              {m}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
 
-      <View style={s.graph}>
-        {history.map((r,i)=>
-          <View key={i} style={s.graphCol}>
-            <View
-              style={[
-                s.graphBar,
-                {
-                  height:Math.max(
-                    8,
-                    24+((r.value-min)/(max-min||1))*120
-                  )
-                }
-              ]}
-            />
-            <Text style={s.graphLabel}>{r.value}</Text>
-          </View>
-        )}
-      </View>
+      {history.length===0
+        ?<View style={s.emptyState}>
+            <Text style={s.bodyBold}>
+              No {metric} results yet
+            </Text>
 
-      <Text style={s.muted}>
-        {metric} history • {units[metric]} • Demo values
-      </Text>
+            <Text style={s.muted}>
+              Log your first {metric} result to start building your progress history.
+            </Text>
+          </View>
+        :<>
+            <View style={s.graph}>
+              {history.map(r=>
+                <View key={r.id} style={s.graphCol}>
+                  <View
+                    style={[
+                      s.graphBar,
+                      {
+                        height:Math.max(
+                          8,
+                          24+
+                          ((r.value-min)/(max-min||1))*120
+                        )
+                      }
+                    ]}
+                  />
+
+                  <Text style={s.graphLabel}>
+                    {r.value}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <Text style={s.muted}>
+              {metric} history • {units[metric]}
+            </Text>
+          </>
+      }
     </Card>;
 
   const goalCards=
     <Card title="Current Goals">
-      {metrics.map(m=>{
-        const ratio=m==='40 Yard Dash'
-          ?Math.min(1,goals[m]/(latest[m]||1))
-          :Math.min(1,latest[m]/goals[m]);
+      {metrics.every(m=>goals[m]===undefined)
+        ?<Text style={s.muted}>
+            No goals set yet. Choose a metric and set your first goal.
+          </Text>
+        :metrics.map(m=>{
+            const goal=goals[m];
 
-        return <View key={m} style={s.goalRow}>
-          <View style={s.space}>
-            <Text style={s.bodyBold}>{m}</Text>
-            <Text style={s.muted}>
-              {latest[m]} / {goals[m]} {units[m]}
-            </Text>
-          </View>
+            if(goal===undefined){
+              return null;
+            }
 
-          <View style={s.track}>
-            <View
-              style={[
-                s.fill,
-                {
-                  width:`${Math.max(0,Math.min(100,ratio*100))}%`
-                }
-              ]}
-            />
-          </View>
-        </View>
-      })}
+            const current=latest[m];
 
-      <Btn title="Edit Goals" outline onPress={()=>setPage('Goals')}/>
+            const lowerIsBetter=
+              m==='40 Yard Dash'||
+              m==='3 Cone Drill'||
+              m==='L Drill';
+
+            const ratio=
+              current===undefined
+                ?0
+                :lowerIsBetter
+                  ?Math.min(1,goal/current)
+                  :Math.min(1,current/goal);
+
+            return <View key={m} style={s.goalRow}>
+              <View style={s.space}>
+                <Text style={s.bodyBold}>{m}</Text>
+
+                <Text style={s.muted}>
+                  {current===undefined?'—':current}
+                  {' / '}
+                  {goal} {units[m]}
+                </Text>
+              </View>
+
+              <View style={s.track}>
+                <View
+                  style={[
+                    s.fill,
+                    {
+                      width:
+                        `${Math.max(
+                          0,
+                          Math.min(
+                            100,
+                            ratio*100
+                          )
+                        )}%`
+                    }
+                  ]}
+                />
+              </View>
+            </View>;
+          })
+      }
+
+      <Btn
+        title="Edit Goals"
+        outline
+        onPress={()=>setPage('Goals')}
+      />
     </Card>;
 
   const activity=
     <Card title="Recent Activity">
-      {results.slice(-5).reverse().map((r,i)=>
-        <View key={i} style={s.activity}>
-          <Text style={s.accent}>↑</Text>
-          <View>
-            <Text style={s.bodyBold}>
-              {r.metric}: {r.value} {units[r.metric]}
-            </Text>
-            <Text style={s.muted}>{r.date}</Text>
-          </View>
-        </View>
-      )}
+      {results.length===0
+        ?<Text style={s.muted}>
+            No results logged yet.
+          </Text>
+        :results
+          .slice(-5)
+          .reverse()
+          .map(r=>
+            <View key={r.id} style={s.activity}>
+              <Text style={s.accent}>↑</Text>
+
+              <View>
+                <Text style={s.bodyBold}>
+                  {r.metric}: {r.value} {units[r.metric]}
+                </Text>
+
+                <Text style={s.muted}>
+                  {new Date(
+                    r.recordedAt
+                  ).toLocaleDateString()}
+                </Text>
+              </View>
+            </View>
+          )
+      }
     </Card>;
 
   const logForm=
@@ -709,7 +957,7 @@ const [registerLoading,setRegisterLoading]=useState(false);
       <Btn title="Save Result" onPress={saveResult}/>
 
       <Text style={s.footnote}>
-        Demo only: results reset when the app reloads.
+        Results are saved to your NextRep account.
       </Text>
     </Card>;
 
@@ -1458,6 +1706,7 @@ const s=StyleSheet.create({
   graphCol:{alignItems:'center',justifyContent:'flex-end',gap:5},
   graphBar:{width:25,backgroundColor:MAROON,borderTopLeftRadius:5,borderTopRightRadius:5},
   graphLabel:{fontSize:11,color:'#646b75'},
+  emptyState:{minHeight:130,justifyContent:'center',alignItems:'center',padding:20},
   goalRow:{marginBottom:13,gap:6},
   space:{flexDirection:'row',justifyContent:'space-between'},
   bodyBold:{fontWeight:'700',color:'#252a31',fontSize:13},

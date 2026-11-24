@@ -6,10 +6,16 @@ const teamController = require("./controllers/teamController");
 
 const { requireAuth, requireRole } = require("./middleware/auth");
 const { initializeDatabase } = require("./database");
+const profileController =
+  require("./controllers/profileController");
+
+const performanceController =
+  require("./controllers/performanceController");
 
 const app = express();
 
 const PORT = process.env.PORT || 3000;
+
 
 app.use(cors());
 app.use(express.json());
@@ -52,7 +58,61 @@ app.get(
     });
   }
 );
+// --------------------
+// Player Profile
+// --------------------
 
+app.get(
+  "/profile",
+  requireAuth,
+  requireRole("player"),
+  profileController.getProfile
+);
+
+app.put(
+  "/profile",
+  requireAuth,
+  requireRole("player"),
+  profileController.saveProfile
+);
+
+
+// --------------------
+// Player Performance
+// --------------------
+
+app.get(
+  "/performance-results/mine",
+  requireAuth,
+  requireRole("player"),
+  performanceController.getMyResults
+);
+
+app.post(
+  "/performance-results",
+  requireAuth,
+  requireRole("player"),
+  performanceController.logResult
+);
+
+
+// --------------------
+// Player Goals
+// --------------------
+
+app.get(
+  "/goals/mine",
+  requireAuth,
+  requireRole("player"),
+  performanceController.getMyGoals
+);
+
+app.put(
+  "/goals",
+  requireAuth,
+  requireRole("player"),
+  performanceController.saveGoal
+);
 
 
 // --------------------
