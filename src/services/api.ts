@@ -174,3 +174,91 @@ export async function getTeamMembers(
   const data=await readJson(response);
   return data.members;
 }
+export async function getMyPerformanceResults(
+  token:string
+){
+  const response=await fetch(
+    `${API_URL}/performance-results/mine`,
+    {
+      method:'GET',
+      headers:{
+        Authorization:`Bearer ${token}`
+      }
+    }
+  );
+
+  const data=await readJson(response);
+
+  return data.results;
+}
+
+
+export async function logPerformanceResult(
+  token:string,
+  metric:string,
+  value:number
+){
+  const response=await fetch(
+    `${API_URL}/performance-results`,
+    {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        Authorization:`Bearer ${token}`
+      },
+      body:JSON.stringify({
+        metric,
+        value
+      })
+    }
+  );
+
+  const data=await readJson(response);
+
+  return data.result;
+}
+
+
+export async function getMyGoals(
+  token:string
+){
+  const response=await fetch(
+    `${API_URL}/goals/mine`,
+    {
+      method:'GET',
+      headers:{
+        Authorization:`Bearer ${token}`
+      }
+    }
+  );
+
+  const data=await readJson(response);
+
+  return data.goals;
+}
+
+
+export async function saveMyGoal(
+  token:string,
+  metric:string,
+  targetValue:number
+){
+  const response=await fetch(
+    `${API_URL}/goals`,
+    {
+      method:'PUT',
+      headers:{
+        'Content-Type':'application/json',
+        Authorization:`Bearer ${token}`
+      },
+      body:JSON.stringify({
+        metric,
+        targetValue
+      })
+    }
+  );
+
+  const data=await readJson(response);
+
+  return data.goal;
+}

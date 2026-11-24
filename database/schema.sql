@@ -74,6 +74,28 @@ CREATE TABLE IF NOT EXISTS metrics (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Standard performance tests tracked by NextRep
+INSERT INTO metrics
+(
+    name,
+    unit,
+    better_direction
+)
+VALUES
+    ('Squat', 'lbs', 'higher'),
+    ('Bench', 'lbs', 'higher'),
+    ('Hang Clean', 'lbs', 'higher'),
+    ('Vertical', 'in', 'higher'),
+    ('40 Yard Dash', 'sec', 'lower'),
+    ('3 Cone Drill', 'sec', 'lower'),
+    ('L Drill', 'sec', 'lower')
+
+ON CONFLICT (name)
+
+DO UPDATE SET
+    unit = EXCLUDED.unit,
+    better_direction = EXCLUDED.better_direction;
+
 
 CREATE TABLE IF NOT EXISTS performance_results (
     id SERIAL PRIMARY KEY,
